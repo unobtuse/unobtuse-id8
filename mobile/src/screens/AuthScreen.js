@@ -1,6 +1,6 @@
 import React, {
     useState
-} from 'react';
+} from "react";
 import {
     View,
     Text,
@@ -8,30 +8,30 @@ import {
     Image,
     Platform,
     TextInput,
-    TouchableOpacity
-} from 'react-native';
+    TouchableOpacity,
+} from "react-native";
 import {
     SafeAreaView
-} from 'react-native-safe-area-context';
+} from "react-native-safe-area-context";
 import Animated, {
     FadeIn,
     FadeInUp
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 import {
     Ionicons
-} from '@expo/vector-icons';
-import BackgroundWrapper from '../components/BackgroundWrapper';
-import GlassCard from '../components/GlassCard';
-import Button from '../components/Button';
+} from "@expo/vector-icons";
+import BackgroundWrapper from "../components/BackgroundWrapper";
+import GlassCard from "../components/GlassCard";
+import Button from "../components/Button";
 import {
     useAuth
-} from '../context/AuthContext';
+} from "../context/AuthContext";
 import {
     useTheme
-} from '../context/ThemeContext';
+} from "../context/ThemeContext";
 import {
     useToast
-} from '../context/ToastContext';
+} from "../context/ToastContext";
 
 export default function AuthScreen() {
     const {
@@ -40,7 +40,8 @@ export default function AuthScreen() {
         registerWithEmail,
         loading,
         isReady
-    } = useAuth();
+    } =
+    useAuth();
     const {
         colors,
         theme
@@ -48,24 +49,25 @@ export default function AuthScreen() {
     const {
         showToast
     } = useToast();
-    const [mode, setMode] = useState('welcome');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
+    const [mode, setMode] = useState("welcome");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [name, setName] = useState("");
     const [emailLoading, setEmailLoading] = useState(false);
 
-    const logoUrl = theme === 'dark' ? '/id8-logo-darkmode.svg' : '/id8-logo-lightmode.svg';
+    const logoUrl =
+        theme === "dark" ? "/id8-logo-darkmode.svg" : "/id8-logo-lightmode.svg";
 
     const handleEmailLogin = async () => {
         if (!email.trim() || !password) {
-            showToast('Please enter email and password', 'error');
+            showToast("Please enter email and password", "error");
             return;
         }
         setEmailLoading(true);
         try {
             await signInWithEmail(email.trim(), password);
         } catch (error) {
-            showToast(error.message || 'Login failed', 'error');
+            showToast(error.message || "Login failed", "error");
         } finally {
             setEmailLoading(false);
         }
@@ -73,18 +75,18 @@ export default function AuthScreen() {
 
     const handleRegister = async () => {
         if (!email.trim() || !password || !name.trim()) {
-            showToast('Please fill in all fields', 'error');
+            showToast("Please fill in all fields", "error");
             return;
         }
         if (password.length < 6) {
-            showToast('Password must be at least 6 characters', 'error');
+            showToast("Password must be at least 6 characters", "error");
             return;
         }
         setEmailLoading(true);
         try {
             await registerWithEmail(email.trim(), password, name.trim());
         } catch (error) {
-            showToast(error.message || 'Registration failed', 'error');
+            showToast(error.message || "Registration failed", "error");
         } finally {
             setEmailLoading(false);
         }
@@ -94,14 +96,17 @@ export default function AuthScreen() {
         >
         <
         Text style = {
-            [styles.cardDescription, {
-                color: colors.textSecondary
-            }]
+            [
+                styles.cardDescription,
+                {
+                    color: colors.textSecondary,
+                },
+            ]
         } >
-        Sign in to start tracking your ideas and collaborate with others. <
-        /Text>
-
-        <
+        Sign in to start tracking your ideas and collaborate with others. {
+            " "
+        } <
+        /Text> <
         Button title = "Continue with Google"
         onPress = {
             signIn
@@ -123,27 +128,35 @@ export default function AuthScreen() {
         style = {
             styles.authButton
         }
-        />
-
-        <
+        /> <
         View style = {
-            [styles.divider, {
-                borderColor: colors.glassBorder
-            }]
+            [
+                styles.divider,
+                {
+                    borderColor: colors.glassBorder,
+                },
+            ]
         } >
         <
         Text style = {
-            [styles.dividerText, {
-                color: colors.textSecondary
-            }]
-        } > or < /Text> < /
-        View >
-
-        <
+            [
+                styles.dividerText,
+                {
+                    color: colors.textSecondary,
+                },
+            ]
+        } > {
+            " "
+        }
+        or {
+            " "
+        } <
+        /Text>{" "} < /
+        View > <
         Button title = "Sign in with Email"
         variant = "outline"
         onPress = {
-            () => setMode('login')
+            () => setMode("login")
         }
         icon = {
             <
@@ -158,11 +171,10 @@ export default function AuthScreen() {
             style = {
                 styles.authButton
             }
-            />
-
-            <
-            TouchableOpacity onPress = {
-                () => setMode('register')
+            /> <
+            TouchableOpacity
+            onPress = {
+                () => setMode("register")
             }
             style = {
                 styles.switchMode
@@ -173,27 +185,43 @@ export default function AuthScreen() {
                     color: colors.textSecondary
                 }]
             } >
-            Don 't have an account? <Text style={{ color: colors.accent }}>Sign up</Text> < /
-            Text > <
-            /TouchableOpacity> < / >
+            Don 't have an account?{" "} <
+            Text style = {
+                {
+                    color: colors.accent
+                }
+            } > Sign up < /Text> <
+            /Text> <
+            /TouchableOpacity> <
+            />
         );
 
         const renderLogin = () => ( <
             >
             <
             Text style = {
-                [styles.cardTitle, {
-                    color: colors.text
-                }]
-            } > Sign In < /Text>
-
-            <
+                [
+                    styles.cardTitle,
+                    {
+                        color: colors.text,
+                    },
+                ]
+            } > {
+                " "
+            }
+            Sign In {
+                " "
+            } <
+            /Text> <
             TextInput style = {
-                [styles.input, {
-                    color: colors.text,
-                    borderColor: colors.glassBorder,
-                    backgroundColor: `${colors.glass}50`
-                }]
+                [
+                    styles.input,
+                    {
+                        color: colors.text,
+                        borderColor: colors.glassBorder,
+                        backgroundColor: `${colors.glass}50`,
+                    },
+                ]
             }
             placeholder = "Email"
             placeholderTextColor = {
@@ -208,14 +236,16 @@ export default function AuthScreen() {
             keyboardType = "email-address"
             autoCapitalize = "none" /
             >
-
             <
             TextInput style = {
-                [styles.input, {
-                    color: colors.text,
-                    borderColor: colors.glassBorder,
-                    backgroundColor: `${colors.glass}50`
-                }]
+                [
+                    styles.input,
+                    {
+                        color: colors.text,
+                        borderColor: colors.glassBorder,
+                        backgroundColor: `${colors.glass}50`,
+                    },
+                ]
             }
             placeholder = "Password"
             placeholderTextColor = {
@@ -229,7 +259,6 @@ export default function AuthScreen() {
             }
             secureTextEntry /
             >
-
             <
             Button title = "Sign In"
             onPress = {
@@ -241,11 +270,9 @@ export default function AuthScreen() {
             style = {
                 styles.authButton
             }
-            />
-
-            <
+            /> <
             TouchableOpacity onPress = {
-                () => setMode('welcome')
+                () => setMode("welcome")
             }
             style = {
                 styles.backButton
@@ -258,13 +285,20 @@ export default function AuthScreen() {
             color = {
                 colors.textSecondary
             }
-            /> <
+            />{" "} <
             Text style = {
-                [styles.backText, {
-                    color: colors.textSecondary
-                }]
-            } > Back < /Text> < /
-            TouchableOpacity > <
+                [
+                    styles.backText,
+                    {
+                        color: colors.textSecondary,
+                    },
+                ]
+            } > {
+                " "
+            }
+            Back <
+            /Text> <
+            /TouchableOpacity> <
             />
         );
 
@@ -272,18 +306,28 @@ export default function AuthScreen() {
             >
             <
             Text style = {
-                [styles.cardTitle, {
-                    color: colors.text
-                }]
-            } > Create Account < /Text>
-
-            <
+                [
+                    styles.cardTitle,
+                    {
+                        color: colors.text,
+                    },
+                ]
+            } > {
+                " "
+            }
+            Create Account {
+                " "
+            } <
+            /Text> <
             TextInput style = {
-                [styles.input, {
-                    color: colors.text,
-                    borderColor: colors.glassBorder,
-                    backgroundColor: `${colors.glass}50`
-                }]
+                [
+                    styles.input,
+                    {
+                        color: colors.text,
+                        borderColor: colors.glassBorder,
+                        backgroundColor: `${colors.glass}50`,
+                    },
+                ]
             }
             placeholder = "Name"
             placeholderTextColor = {
@@ -295,15 +339,16 @@ export default function AuthScreen() {
             onChangeText = {
                 setName
             }
-            />
-
-            <
+            /> <
             TextInput style = {
-                [styles.input, {
-                    color: colors.text,
-                    borderColor: colors.glassBorder,
-                    backgroundColor: `${colors.glass}50`
-                }]
+                [
+                    styles.input,
+                    {
+                        color: colors.text,
+                        borderColor: colors.glassBorder,
+                        backgroundColor: `${colors.glass}50`,
+                    },
+                ]
             }
             placeholder = "Email"
             placeholderTextColor = {
@@ -318,14 +363,16 @@ export default function AuthScreen() {
             keyboardType = "email-address"
             autoCapitalize = "none" /
             >
-
             <
             TextInput style = {
-                [styles.input, {
-                    color: colors.text,
-                    borderColor: colors.glassBorder,
-                    backgroundColor: `${colors.glass}50`
-                }]
+                [
+                    styles.input,
+                    {
+                        color: colors.text,
+                        borderColor: colors.glassBorder,
+                        backgroundColor: `${colors.glass}50`,
+                    },
+                ]
             }
             placeholder = "Password (min 6 characters)"
             placeholderTextColor = {
@@ -339,7 +386,6 @@ export default function AuthScreen() {
             }
             secureTextEntry /
             >
-
             <
             Button title = "Create Account"
             onPress = {
@@ -351,11 +397,9 @@ export default function AuthScreen() {
             style = {
                 styles.authButton
             }
-            />
-
-            <
+            /> <
             TouchableOpacity onPress = {
-                () => setMode('welcome')
+                () => setMode("welcome")
             }
             style = {
                 styles.backButton
@@ -368,13 +412,20 @@ export default function AuthScreen() {
             color = {
                 colors.textSecondary
             }
-            /> <
+            />{" "} <
             Text style = {
-                [styles.backText, {
-                    color: colors.textSecondary
-                }]
-            } > Back < /Text> < /
-            TouchableOpacity > <
+                [
+                    styles.backText,
+                    {
+                        color: colors.textSecondary,
+                    },
+                ]
+            } > {
+                " "
+            }
+            Back <
+            /Text> <
+            /TouchableOpacity> <
             />
         );
 
@@ -395,21 +446,24 @@ export default function AuthScreen() {
             style = {
                 styles.logoContainer
             } > {
-                Platform.OS === 'web' ? ( <
+                " "
+            } {
+                Platform.OS === "web" ? ( <
                     img src = {
                         logoUrl
                     }
                     style = {
                         {
                             width: 280,
-                            height: 100
+                            height: 100,
                         }
                     }
-                    alt = "ID8 logo" / >
+                    alt = "ID8 logo" /
+                    >
                 ) : ( <
                     Image source = {
-                        theme === 'dark' ?
-                        require('../../assets/id8-logo-darkmode.svg') : require('../../assets/id8-logo-lightmode.svg')
+                        theme === "dark" ?
+                        require("../../assets/id8-logo-darkmode.svg") : require("../../assets/id8-logo-lightmode.svg")
                     }
                     style = {
                         styles.logo
@@ -417,24 +471,27 @@ export default function AuthScreen() {
                     resizeMode = "contain" /
                     >
                 )
+            } {
+                " "
             } <
-            /Animated.View>
-
-            <
+            /Animated.View> <
             Animated.View entering = {
                 FadeInUp.delay(300).duration(600)
             } >
             <
             Text style = {
-                [styles.subtitle, {
-                    color: colors.textSecondary
-                }]
+                [
+                    styles.subtitle,
+                    {
+                        color: colors.textSecondary,
+                    },
+                ]
             } >
-            Capture ideas.Iterate.Collaborate. <
-            /Text> < /
-            Animated.View >
-
-            <
+            Capture ideas.Iterate.Collaborate. {
+                " "
+            } <
+            /Text>{" "} < /
+            Animated.View > <
             Animated.View entering = {
                 FadeInUp.delay(500).duration(600)
             }
@@ -448,28 +505,43 @@ export default function AuthScreen() {
             intensity = {
                 30
             } > {
-                mode === 'welcome' && renderWelcome()
+                " "
             } {
-                mode === 'login' && renderLogin()
+                mode === "welcome" && renderWelcome()
             } {
-                mode === 'register' && renderRegister()
+                " "
+            } {
+                mode === "login" && renderLogin()
+            } {
+                " "
+            } {
+                mode === "register" && renderRegister()
+            } {
+                " "
             } <
-            /GlassCard> < /
-            Animated.View > <
-            /View>
-
-            <
+            /GlassCard>{" "} < /
+            Animated.View > {
+                " "
+            } <
+            /View> <
             Animated.Text entering = {
                 FadeIn.delay(800).duration(600)
             }
             style = {
-                [styles.footer, {
-                    color: colors.textTertiary
-                }]
+                [
+                    styles.footer,
+                    {
+                        color: colors.textTertiary,
+                    },
+                ]
             } >
-            By continuing, you agree to our Terms of Service <
-            /Animated.Text> < /
-            SafeAreaView > <
+            By continuing, you agree to our Terms of Service {
+                " "
+            } <
+            /Animated.Text>{" "} < /
+            SafeAreaView > {
+                " "
+            } <
             /BackgroundWrapper>
         );
     }
@@ -480,85 +552,93 @@ export default function AuthScreen() {
         },
         content: {
             flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: 24,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 32, // Increased padding
+            paddingVertical: 40,
         },
         logoContainer: {
-            marginBottom: 16,
+            marginBottom: 32, // Increased margin
         },
         logo: {
             width: 280,
             height: 100,
         },
         subtitle: {
-            fontSize: 16,
-            textAlign: 'center',
-            marginBottom: 48,
+            fontSize: 18, // Slightly larger
+            textAlign: "center",
+            marginBottom: 56, // Increased margin
+            fontWeight: "500",
         },
         cardContainer: {
-            width: '100%',
-            maxWidth: 400,
+            width: "100%",
+            maxWidth: 420, // Slightly wider
         },
         card: {
-            alignItems: 'center',
+            alignItems: "center",
+            paddingVertical: 32, // Add internal padding to card
+            paddingHorizontal: 24,
         },
         cardTitle: {
             fontSize: 24,
-            fontWeight: '600',
+            fontWeight: 'bold',
             marginBottom: 8,
-            textAlign: 'center',
-            width: '100%',
+            textAlign: 'center', // Center title
         },
         cardDescription: {
             fontSize: 14,
-            textAlign: 'center',
             marginBottom: 24,
-            lineHeight: 20,
+            textAlign: 'center', // Center description
         },
         authButton: {
-            width: '100%',
+            width: "100%",
+            marginTop: 8,
         },
         divider: {
-            width: '100%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginVertical: 16,
+            width: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            marginVertical: 24, // Increased margin
         },
         dividerText: {
-            fontSize: 12,
-            paddingHorizontal: 8,
+            fontSize: 14,
+            paddingHorizontal: 12,
+            fontWeight: "500",
         },
         input: {
             width: '100%',
             borderWidth: 1,
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            paddingVertical: 14,
+            borderRadius: 16,
+            paddingHorizontal: 20,
+            paddingVertical: 16,
             fontSize: 16,
-            marginBottom: 12,
+            marginBottom: 16,
+            marginTop: 8, // Add margin above inputs
         },
         switchMode: {
-            marginTop: 16,
-            alignItems: 'center',
+            marginTop: 24, // Increased margin
+            alignItems: "center",
         },
         switchText: {
             fontSize: 14,
-            textAlign: 'center',
+            textAlign: "center",
         },
         backButton: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: 16,
-            gap: 4,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 24, // Increased margin
+            gap: 6,
+            paddingVertical: 8,
         },
         backText: {
-            fontSize: 14,
+            fontSize: 15,
+            fontWeight: "500",
         },
         footer: {
-            fontSize: 12,
-            textAlign: 'center',
-            paddingBottom: 16,
+            fontSize: 13,
+            textAlign: "center",
+            paddingBottom: 24,
+            opacity: 0.7,
         },
     });

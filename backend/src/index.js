@@ -1,8 +1,12 @@
 require('dotenv').config();
 const express = require('express');
-const { createServer } = require('http');
+const {
+    createServer
+} = require('http');
 const cors = require('cors');
-const { initSocket } = require('./config/socket');
+const {
+    initSocket
+} = require('./config/socket');
 const authRoutes = require('./routes/auth');
 const ideasRoutes = require('./routes/ideas');
 const repliesRoutes = require('./routes/replies');
@@ -10,6 +14,7 @@ const attachmentsRoutes = require('./routes/attachments');
 const collaboratorsRoutes = require('./routes/collaborators');
 const settingsRoutes = require('./routes/settings');
 const pushRoutes = require('./routes/push');
+const logsRoutes = require('./routes/logs');
 
 const app = express();
 const server = createServer(app);
@@ -19,8 +24,8 @@ const PORT = process.env.PORT || 3000;
 initSocket(server);
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true
 }));
 app.use(express.json());
 
@@ -32,12 +37,17 @@ app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/collaborators', collaboratorsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/logs', logsRoutes);
+app.use('/api/og', require('./routes/og'));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString()
+    });
 });
 
 server.listen(PORT, () => {
-  console.log(`id8 API server running on port ${PORT}`);
+    console.log(`id8 API server running on port ${PORT}`);
 });

@@ -5,22 +5,56 @@
 @tailwind utilities;
 
 /* Apply Inter font globally - override React Native Web defaults */
-html, body, #root {
-  font-family: 'Inter', sans-serif !important;
+html,
+body,
+#root {
+    font-family: 'Inter', sans-serif !important;
+    height: 100%;
+    /* Ensure full height on mobile browsers */
+    min-height: 100dvh;
+    width: 100%;
+    /* Prevent scrolling on the body itself, let React Native handle it */
+    overflow: hidden;
+    /* Fix for iOS overscroll */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Mask any potential gaps with black background */
+    background-color: #000;
+    /* Prevent rubber-banding */
+    overscroll-behavior: none;
+}
+
+#root {
+    display: flex;
+    flex-direction: column;
 }
 
 /* Apply to text elements but exclude icon fonts */
-p, h1, h2, h3, h4, h5, h6, a, label {
-  font-family: 'Inter', sans-serif !important;
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+a,
+label {
+    font-family: 'Inter', sans-serif !important;
 }
 
-input, button, textarea, select {
-  font-family: 'Inter', sans-serif !important;
+input,
+button,
+textarea,
+select {
+    font-family: 'Inter', sans-serif !important;
 }
 
 /* Target React Native Web text elements */
 div[dir="auto"] {
-  font-family: 'Inter', sans-serif !important;
+    font-family: 'Inter', sans-serif;
 }
 
 /* Preserve all icon fonts */
@@ -38,16 +72,16 @@ div[dir="auto"] {
 [style*="Zocial"],
 [style*="Fontisto"],
 [data-testid*="icon"] {
-  font-family: inherit !important;
+    font-family: inherit !important;
 }
 
 /* Glassmorphic utilities for web */
 .glass-blur {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 /* Invert filter for light mode background */
 .invert {
-  filter: invert(1);
+    filter: invert(1);
 }
