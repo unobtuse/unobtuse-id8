@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getThemeColors } from '../theme/colors';
+import { api } from '../services/api';
 
 const ThemeContext = createContext();
 
@@ -16,13 +17,9 @@ export function ThemeProvider({ children }) {
 
   const loadThemeSettings = async () => {
     try {
+      // First load from local storage for fast initial render
       const savedTheme = await AsyncStorage.getItem('theme');
-      const savedBgUrl = await AsyncStorage.getItem('backgroundUrl');
-      const savedBgType = await AsyncStorage.getItem('backgroundType');
-      
       if (savedTheme) setTheme(savedTheme);
-      if (savedBgUrl) setBackgroundUrl(savedBgUrl);
-      if (savedBgType) setBackgroundType(savedBgType);
     } catch (e) {
       console.log('Error loading theme:', e);
     } finally {
@@ -30,22 +27,43 @@ export function ThemeProvider({ children }) {
     }
   };
 
+  // Sync settings from server when user is authenticated
+  const syncFromServer = useCallback(async () => {
+    try {
+      const settings = await api.get('/settings');
+      if (settings) {
+        if (settings.theme) {
+          setTheme(settings.theme);
+          await AsyncStorage.setItem('theme', settings.theme);
+        }
+        if (settings.background_url) {
+          setBackgroundUrl(settings.background_url);
+          setBackgroundType(settings.background_type || 'image');
+        } else {
+          setBackgroundUrl(null);
+          setBackgroundType('image');
+        }
+      }
+    } catch (e) {
+      console.log('Error syncing settings from server:', e);
+    }
+  }, []);
+
   const toggleTheme = async () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
     await AsyncStorage.setItem('theme', newTheme);
+    // Sync to server
+    try {
+      await api.patch('/settings/theme', { theme: newTheme });
+    } catch (e) {
+      console.log('Error syncing theme to server:', e);
+    }
   };
 
   const updateBackground = async (url, type) => {
     setBackgroundUrl(url);
-    setBackgroundType(type);
-    if (url) {
-      await AsyncStorage.setItem('backgroundUrl', url);
-      await AsyncStorage.setItem('backgroundType', type);
-    } else {
-      await AsyncStorage.removeItem('backgroundUrl');
-      await AsyncStorage.removeItem('backgroundType');
-    }
+    setBackgroundType(type || 'image');
   };
 
   const colors = getThemeColors(theme);
@@ -58,6 +76,7 @@ export function ThemeProvider({ children }) {
       backgroundUrl,
       backgroundType,
       updateBackground,
+      syncFromServer,
       loading,
     }}>
       {children}

@@ -21,13 +21,27 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#C7B500"
       },
       "package": "com.unobtuse.id8"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "ID8",
+      "shortName": "ID8",
+      "description": "Capture ideas. Iterate. Collaborate.",
+      "themeColor": "#C7B500",
+      "backgroundColor": "#000000",
+      "meta": {
+        "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+      }
     },
-    "scheme": "id8"
+    "scheme": "id8",
+    "plugins": [
+      "expo-video",
+      "expo-web-browser"
+    ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,35 +15,121 @@ import BackgroundWrapper from '../components/BackgroundWrapper';
 import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
 import IdeaCard from '../components/IdeaCard';
+import OnboardingModal from '../components/OnboardingModal';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
+import { onSocketEvent } from '../services/socket';
+
+const NewIdeaForm = memo(({ onSubmit, onCancel, colors }) => {
+  const [title, setTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!title.trim()) return;
+    setCreating(true);
+    try {
+      await onSubmit(title.trim());
+      setTitle('');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Animated.View entering={FadeIn.duration(200)} style={styles.newIdeaContainer}>
+      <GlassCard>
+        <TextInput
+          style={[styles.input, { color: colors.text }]}
+          placeholder="What's your idea?"
+          placeholderTextColor={colors.textTertiary}
+          value={title}
+          onChangeText={setTitle}
+          autoFocus
+          onSubmitEditing={handleSubmit}
+        />
+        <View style={styles.newIdeaActions}>
+          <Button
+            title="Cancel"
+            variant="outline"
+            onPress={() => {
+              setTitle('');
+              onCancel();
+            }}
+            style={{ flex: 1, marginRight: 8 }}
+          />
+          <Button
+            title="Create"
+            onPress={handleSubmit}
+            loading={creating}
+            disabled={!title.trim()}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </GlassCard>
+    </Animated.View>
+  );
+});
 
 export default function IdeasScreen({ navigation }) {
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [showNewIdea, setShowNewIdea] = useState(false);
-  const [newIdeaTitle, setNewIdeaTitle] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ visible: false, idea: null });
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const hasAnimated = useRef(false);
 
-  const fetchIdeas = useCallback(async () => {
+  // Check if user has seen onboarding
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const settings = await api.get('/settings');
+        if (!settings.has_seen_onboarding) {
+          setShowOnboarding(true);
+        }
+      } catch (e) {
+        console.log('Error checking onboarding:', e);
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  const fetchIdeas = useCallback(async (isPolling = false) => {
     try {
       const data = await api.get(`/ideas?archived=${showArchived}`);
-      setIdeas(data);
+      // Only update state if data has changed (prevents re-renders during polling)
+      setIdeas(prev => {
+        const prevStr = JSON.stringify(prev);
+        const newStr = JSON.stringify(data);
+        return prevStr === newStr ? prev : data;
+      });
     } catch (error) {
       console.error('Fetch ideas error:', error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!isPolling) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [showArchived]);
 
   useEffect(() => {
     fetchIdeas();
+    
+    // Listen for ideas updates via WebSocket
+    const unsubUpdated = onSocketEvent('ideas:updated', () => {
+      fetchIdeas(true);
+    });
+    
+    return () => {
+      unsubUpdated();
+    };
   }, [fetchIdeas]);
 
   const handleRefresh = () => {
@@ -52,19 +137,14 @@ export default function IdeasScreen({ navigation }) {
     fetchIdeas();
   };
 
-  const handleCreateIdea = async () => {
-    if (!newIdeaTitle.trim()) return;
-    
-    setCreating(true);
+  const handleCreateIdea = async (title) => {
     try {
-      const newIdea = await api.post('/ideas', { title: newIdeaTitle.trim() });
+      const newIdea = await api.post('/ideas', { title });
       setIdeas(prev => [newIdea, ...prev]);
-      setNewIdeaTitle('');
       setShowNewIdea(false);
     } catch (error) {
-      Alert.alert('Error', 'Failed to create idea');
-    } finally {
-      setCreating(false);
+      showToast('Failed to create idea', 'error');
+      throw error;
     }
   };
 
@@ -73,34 +153,32 @@ export default function IdeasScreen({ navigation }) {
       await api.patch(`/ideas/${idea.id}/archive`, { archived: !idea.is_archived });
       fetchIdeas();
     } catch (error) {
-      Alert.alert('Error', 'Failed to archive idea');
+      showToast('Failed to archive idea', 'error');
     }
   };
 
-  const handleDelete = async (idea) => {
-    Alert.alert(
-      'Delete Idea',
-      'Are you sure you want to permanently delete this idea?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete(`/ideas/${idea.id}`);
-              fetchIdeas();
-            } catch (error) {
-              Alert.alert('Error', error.message);
-            }
-          }
-        },
-      ]
-    );
+  const handleDelete = (idea) => {
+    setConfirmModal({ visible: true, idea });
   };
 
-  const renderHeader = () => (
-    <Animated.View entering={FadeInUp.duration(400)}>
+  const confirmDelete = async () => {
+    const idea = confirmModal.idea;
+    setConfirmModal({ visible: false, idea: null });
+    try {
+      await api.delete(`/ideas/${idea.id}`);
+      fetchIdeas();
+      showToast('Idea deleted', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to delete idea', 'error');
+    }
+  };
+
+  const renderHeader = () => {
+    const shouldAnimate = !hasAnimated.current;
+    if (shouldAnimate) hasAnimated.current = true;
+    
+    return (
+    <Animated.View entering={shouldAnimate ? FadeInUp.duration(400) : undefined}>
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: colors.textSecondary }]}>
@@ -158,40 +236,15 @@ export default function IdeasScreen({ navigation }) {
       </View>
 
       {showNewIdea && (
-        <Animated.View entering={FadeIn.duration(200)} style={styles.newIdeaContainer}>
-          <GlassCard>
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="What's your idea?"
-              placeholderTextColor={colors.textTertiary}
-              value={newIdeaTitle}
-              onChangeText={setNewIdeaTitle}
-              autoFocus
-              onSubmitEditing={handleCreateIdea}
-            />
-            <View style={styles.newIdeaActions}>
-              <Button
-                title="Cancel"
-                variant="outline"
-                onPress={() => {
-                  setShowNewIdea(false);
-                  setNewIdeaTitle('');
-                }}
-                style={{ flex: 1, marginRight: 8 }}
-              />
-              <Button
-                title="Create"
-                onPress={handleCreateIdea}
-                loading={creating}
-                disabled={!newIdeaTitle.trim()}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </GlassCard>
-        </Animated.View>
+        <NewIdeaForm 
+          onSubmit={handleCreateIdea}
+          onCancel={() => setShowNewIdea(false)}
+          colors={colors}
+        />
       )}
     </Animated.View>
   );
+  };
 
   const renderEmpty = () => (
     <Animated.View entering={FadeIn.delay(200).duration(400)} style={styles.empty}>
@@ -222,7 +275,9 @@ export default function IdeasScreen({ navigation }) {
               idea={item}
               index={index}
               onPress={() => navigation.navigate('IdeaDetail', { ideaId: item.id })}
-              onArchive={showArchived ? handleDelete : handleArchive}
+              onArchive={handleArchive}
+              onRestore={handleArchive}
+              onDelete={handleDelete}
             />
           )}
           ListHeaderComponent={renderHeader}
@@ -251,6 +306,36 @@ export default function IdeasScreen({ navigation }) {
           </Animated.View>
         )}
       </SafeAreaView>
+
+      {confirmModal.visible && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>Delete Idea?</Text>
+            <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+              This will permanently delete "{confirmModal.idea?.title}". This action cannot be undone.
+            </Text>
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmButton, styles.cancelButton, { borderColor: colors.glassBorder }]}
+                onPress={() => setConfirmModal({ visible: false, idea: null })}
+              >
+                <Text style={[styles.confirmButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmButton, styles.deleteButton]}
+                onPress={confirmDelete}
+              >
+                <Text style={[styles.confirmButtonText, { color: '#fff' }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      <OnboardingModal 
+        visible={showOnboarding} 
+        onClose={() => setShowOnboarding(false)} 
+      />
     </BackgroundWrapper>
   );
 }
@@ -340,5 +425,55 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  confirmModal: {
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 320,
+    width: '90%',
+    borderWidth: 1,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

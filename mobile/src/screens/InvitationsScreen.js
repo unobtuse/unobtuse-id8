@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   FlatList,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,10 +13,12 @@ import BackgroundWrapper from '../components/BackgroundWrapper';
 import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 
 export default function InvitationsScreen({ navigation }) {
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,9 +41,9 @@ export default function InvitationsScreen({ navigation }) {
     try {
       await api.patch(`/collaborators/${id}/respond`, { accept });
       setInvitations(prev => prev.filter(inv => inv.id !== id));
-      Alert.alert('Success', accept ? 'Invitation accepted!' : 'Invitation declined');
+      showToast(accept ? 'Invitation accepted!' : 'Invitation declined', 'success');
     } catch (error) {
-      Alert.alert('Error', 'Failed to respond to invitation');
+      showToast('Failed to respond to invitation', 'error');
     }
   };
 

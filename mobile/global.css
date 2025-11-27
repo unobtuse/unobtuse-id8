@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Apply Inter font globally - override React Native Web defaults */
+html, body, #root {
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Apply to text elements but exclude icon fonts */
+p, h1, h2, h3, h4, h5, h6, a, label {
+  font-family: 'Inter', sans-serif !important;
+}
+
+input, button, textarea, select {
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Target React Native Web text elements */
+div[dir="auto"] {
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Preserve all icon fonts */
+[style*="Ionicons"],
+[style*="FontAwesome"],
+[style*="MaterialIcons"],
+[style*="MaterialCommunityIcons"],
+[style*="Feather"],
+[style*="AntDesign"],
+[style*="Entypo"],
+[style*="EvilIcons"],
+[style*="Foundation"],
+[style*="Octicons"],
+[style*="SimpleLineIcons"],
+[style*="Zocial"],
+[style*="Fontisto"],
+[data-testid*="icon"] {
+  font-family: inherit !important;
+}
+
+/* Glassmorphic utilities for web */
+.glass-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Invert filter for light mode background */
+.invert {
+  filter: invert(1);
+}

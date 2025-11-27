@@ -8,11 +8,24 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 1024 * 1024 * 1024 } // 1GB limit
 });
 
+// Multer error handler
+const handleUpload = (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum size is 1GB.' });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+};
+
 // Upload attachment
-router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+router.post('/upload', authenticateToken, handleUpload, async (req, res) => {
   try {
     const { ideaId, replyId } = req.body;
     const file = req.file;
