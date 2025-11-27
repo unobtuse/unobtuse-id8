@@ -1,6 +1,9 @@
 const express = require('express');
 const pool = require('../config/db');
+const { deleteFromS3 } = require('../config/s3');
 const { authenticateToken } = require('../middleware/auth');
+const { notifyThreadUpdate } = require('../config/push');
+const { emitToIdea, emitToAll } = require('../config/socket');
 
 const router = express.Router();
 
@@ -42,9 +45,7 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { ideaId, content } = req.body;
     
-    if (!content) {
-      return res.status(400).json({ error: 'Content is required' });
-    }
+    // Content can be empty if user is just attaching a file
     
     // Check access to idea
     const accessCheck = await pool.query(
@@ -74,6 +75,22 @@ router.post('/', authenticateToken, async (req, res) => {
        WHERE r.id = $1`,
       [result.rows[0].id]
     );
+
+    // Get idea title for notification
+    const ideaResult = await pool.query('SELECT title FROM ideas WHERE id = $1', [ideaId]);
+    const ideaTitle = ideaResult.rows[0]?.title || 'an idea';
+    
+    // Send push notifications to other participants
+    notifyThreadUpdate(
+      ideaId,
+      req.user.id,
+      'New reply in ' + ideaTitle,
+      fullReply.rows[0].author_name + ': ' + (content || 'shared an attachment')
+    );
+    
+    // Emit socket event for real-time update
+    emitToIdea(ideaId, 'reply:created', fullReply.rows[0]);
+    emitToAll('ideas:updated', { ideaId });
     
     res.status(201).json(fullReply.rows[0]);
   } catch (error) {
@@ -107,13 +124,50 @@ router.put('/:id', authenticateToken, async (req, res) => {
 // Delete reply
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `DELETE FROM idea_replies WHERE id = $1 AND user_id = $2 RETURNING id`,
+    // First check if user owns this reply
+    const replyCheck = await pool.query(
+      `SELECT id FROM idea_replies WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]
     );
     
-    if (result.rows.length === 0) {
+    if (replyCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Reply not found or not authorized' });
+    }
+    
+    // Get all attachments for this reply to delete from S3
+    const attachments = await pool.query(
+      `SELECT file_url FROM attachments WHERE reply_id = $1`,
+      [req.params.id]
+    );
+    
+    // Delete files from S3
+    for (const att of attachments.rows) {
+      try {
+        await deleteFromS3(att.file_url);
+      } catch (s3Error) {
+        console.error('S3 delete error:', s3Error);
+      }
+    }
+    
+    // Delete attachments from database (could also rely on CASCADE)
+    await pool.query(`DELETE FROM attachments WHERE reply_id = $1`, [req.params.id]);
+    
+    // Get the idea_id before deleting
+    const replyData = await pool.query(
+      `SELECT idea_id FROM idea_replies WHERE id = $1`,
+      [req.params.id]
+    );
+    const ideaId = replyData.rows[0]?.idea_id;
+    
+    // Delete the reply
+    const result = await pool.query(
+      `DELETE FROM idea_replies WHERE id = $1 RETURNING id`,
+      [req.params.id]
+    );
+    
+    // Emit socket event for real-time update
+    if (ideaId) {
+      emitToIdea(ideaId, 'reply:deleted', { id: result.rows[0].id });
     }
     
     res.json({ message: 'Reply deleted', id: result.rows[0].id });

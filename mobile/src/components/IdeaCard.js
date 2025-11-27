@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { 
   useSharedValue, 
@@ -13,7 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-export default function IdeaCard({ idea, onPress, onArchive, index }) {
+export default function IdeaCard({ idea, onPress, onArchive, onRestore, onDelete, index }) {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
 
@@ -53,12 +53,19 @@ export default function IdeaCard({ idea, onPress, onArchive, index }) {
       >
         <GlassCard style={styles.card}>
           <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons 
-                name="bulb" 
-                size={20} 
-                color={colors.accent} 
-              />
+            <View style={[styles.iconContainer, idea.icon_url && styles.iconContainerCustom]}>
+              {idea.icon_url ? (
+                <Image 
+                  source={{ uri: idea.icon_url }} 
+                  style={styles.customIcon}
+                />
+              ) : (
+                <Ionicons 
+                  name="bulb" 
+                  size={20} 
+                  color={colors.accent} 
+                />
+              )}
             </View>
             <View style={styles.titleContainer}>
               <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
@@ -68,18 +75,36 @@ export default function IdeaCard({ idea, onPress, onArchive, index }) {
                 {formatDate(idea.updated_at)}
               </Text>
             </View>
-            <TouchableOpacity 
-              style={styles.archiveButton}
-              onPress={() => onArchive(idea)}
-            >
-              <Ionicons 
-                name={idea.is_archived ? 'arrow-undo' : 'archive-outline'} 
-                size={20} 
-                color={colors.textSecondary} 
-              />
-            </TouchableOpacity>
+            {!idea.is_archived && (
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => onArchive(idea)}
+              >
+                <Ionicons name="archive-outline" size={18} color={colors.textSecondary} />
+                <Text style={[styles.actionText, { color: colors.textSecondary }]}>Archive</Text>
+              </TouchableOpacity>
+            )}
           </View>
           
+          {idea.is_archived && (
+            <View style={styles.archivedActions}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.restoreButton, { backgroundColor: `${colors.accent}20` }]}
+                onPress={() => onRestore(idea)}
+              >
+                <Ionicons name="arrow-undo" size={18} color={colors.accent} />
+                <Text style={[styles.actionText, { color: colors.accent }]}>Restore to Active</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={() => onDelete(idea)}
+              >
+                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                <Text style={[styles.actionText, { color: '#ef4444' }]}>Delete Permanently</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {idea.content ? (
             <Text 
               style={[styles.content, { color: colors.textSecondary }]} 
@@ -102,7 +127,7 @@ export default function IdeaCard({ idea, onPress, onArchive, index }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
@@ -115,6 +140,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 214, 0, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  iconContainerCustom: {
+    backgroundColor: 'transparent',
+  },
+  customIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
   },
   titleContainer: {
     flex: 1,
@@ -128,8 +162,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  archiveButton: {
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
+    gap: 6,
+  },
+  actionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  archivedActions: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 12,
+  },
+  restoreButton: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  deleteButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   content: {
     fontSize: 14,

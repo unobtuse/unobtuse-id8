@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Image,
+  Modal,
+  Pressable,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,75 +23,97 @@ import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
+import { joinIdea, leaveIdea, onSocketEvent } from '../services/socket';
 
-export default function IdeaDetailScreen({ route, navigation }) {
-  const { ideaId } = route.params;
-  const { user } = useAuth();
-  const { colors } = useTheme();
-  const [idea, setIdea] = useState(null);
-  const [replies, setReplies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [newReply, setNewReply] = useState('');
+// Memoized invite form to prevent re-renders
+const InviteForm = memo(({ ideaId, colors, onClose, showToast }) => {
+  const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [ideaData, repliesData] = await Promise.all([
-        api.get(`/ideas/${ideaId}`),
-        api.get(`/replies/idea/${ideaId}`),
-      ]);
-      setIdea(ideaData);
-      setReplies(repliesData);
-    } catch (error) {
-      console.error('Fetch error:', error);
-      Alert.alert('Error', 'Failed to load idea');
-      navigation.goBack();
-    } finally {
-      setLoading(false);
-    }
-  }, [ideaId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleSendReply = async () => {
-    if (!newReply.trim() && !selectedFile) return;
-
+  
+  const handleInvite = async () => {
+    if (!email.trim()) return;
     setSending(true);
     try {
-      let reply;
-      if (newReply.trim()) {
-        reply = await api.post('/replies', { 
-          ideaId, 
-          content: newReply.trim() 
-        });
-      }
-
-      if (selectedFile) {
-        await api.uploadFile('/attachments/upload', selectedFile, {
-          ideaId,
-          replyId: reply?.id,
-        });
-      }
-
-      setNewReply('');
-      setSelectedFile(null);
-      fetchData();
+      await api.post('/collaborators/invite', {
+        ideaId,
+        email: email.trim(),
+        role: 'contributor',
+      });
+      showToast('Invitation sent!', 'success');
+      setEmail('');
+      onClose();
     } catch (error) {
-      Alert.alert('Error', 'Failed to send reply');
+      showToast(error.message || 'Failed to send invitation', 'error');
     } finally {
       setSending(false);
     }
   };
 
-  const handlePickImage = async () => {
+  return (
+    <Animated.View entering={FadeIn.duration(200)} style={styles.inviteSection}>
+      <GlassCard>
+        <Text style={[styles.inviteTitle, { color: colors.text }]}>
+          Invite Collaborator
+        </Text>
+        <TextInput
+          style={[styles.inviteInput, { color: colors.text, borderColor: colors.glassBorder }]}
+          placeholder="Enter email address"
+          placeholderTextColor={colors.textTertiary}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <Button title="Send Invite" onPress={handleInvite} loading={sending} />
+      </GlassCard>
+    </Animated.View>
+  );
+});
+
+// Memoized reply composer to prevent re-renders
+const ReplyComposer = memo(({ ideaId, colors, onReplySubmitted, showToast }) => {
+  const [content, setContent] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [sending, setSending] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleSendReply = async () => {
+    if (!content.trim() && !selectedFile) return;
+
+    setSending(true);
+    try {
+      const reply = await api.post('/replies', { 
+        ideaId, 
+        content: content.trim() || '' 
+      });
+
+      if (selectedFile) {
+        await api.uploadFile('/attachments/upload', selectedFile, {
+          ideaId,
+          replyId: reply.id,
+        });
+      }
+
+      setContent('');
+      setSelectedFile(null);
+      onReplySubmitted();
+    } catch (error) {
+      showToast('Failed to send reply', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handlePickFile = async () => {
+    if (Platform.OS === 'web') {
+      fileInputRef.current?.click();
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ['images', 'videos'],
       quality: 0.8,
     });
 
@@ -97,41 +121,188 @@ export default function IdeaDetailScreen({ route, navigation }) {
       const asset = result.assets[0];
       setSelectedFile({
         uri: asset.uri,
-        name: asset.fileName || 'image.jpg',
+        name: asset.fileName || 'file',
         mimeType: asset.type === 'video' ? 'video/mp4' : 'image/jpeg',
       });
     }
   };
 
-  const handlePickDocument = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: '*/*',
-    });
-
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setSelectedFile({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType,
-      });
+  const handleWebFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
     }
   };
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
+  const handleKeyPress = (e) => {
+    if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+      e.preventDefault();
+      handleSendReply();
+    }
+  };
 
+  return (
+    <View style={[styles.inputContainer, { borderTopColor: colors.glassBorder }]}>
+      {Platform.OS === 'web' && (
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+          onChange={handleWebFileChange}
+        />
+      )}
+      {selectedFile && (
+        <View style={[styles.filePreview, { backgroundColor: colors.surface }]}>
+          <Ionicons name="document" size={16} color={colors.accent} />
+          <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
+            {selectedFile.name}
+          </Text>
+          <TouchableOpacity onPress={() => setSelectedFile(null)}>
+            <Ionicons name="close" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+      <View style={styles.inputRow}>
+        <TouchableOpacity onPress={handlePickFile} style={styles.attachButton}>
+          <Ionicons name="attach" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <TextInput
+          style={[styles.replyInput, { color: colors.text, backgroundColor: colors.surface }]}
+          placeholder="Add to the thread..."
+          placeholderTextColor={colors.textTertiary}
+          value={content}
+          onChangeText={setContent}
+          multiline
+          onKeyPress={handleKeyPress}
+          blurOnSubmit={false}
+        />
+        <TouchableOpacity 
+          onPress={handleSendReply}
+          disabled={(!content.trim() && !selectedFile) || sending}
+          style={[
+            styles.sendButton, 
+            { backgroundColor: colors.accent },
+            (!content.trim() && !selectedFile) && styles.sendButtonDisabled,
+          ]}
+        >
+          <Ionicons name="send" size={18} color="#000" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+export default function IdeaDetailScreen({ route, navigation }) {
+  const { ideaId } = route.params;
+  const { user } = useAuth();
+  const { colors } = useTheme();
+  const { showToast } = useToast();
+  const [idea, setIdea] = useState(null);
+  const [replies, setReplies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ visible: false, replyId: null });
+  const iconInputRef = useRef(null);
+
+  const fetchData = useCallback(async (isPolling = false) => {
     try {
-      await api.post('/collaborators/invite', {
-        ideaId,
-        email: inviteEmail.trim(),
-        role: 'contributor',
+      const [ideaData, repliesData] = await Promise.all([
+        api.get(`/ideas/${ideaId}`),
+        api.get(`/replies/idea/${ideaId}`),
+      ]);
+      
+      setIdea(prev => {
+        const prevStr = JSON.stringify(prev);
+        const newStr = JSON.stringify(ideaData);
+        return prevStr === newStr ? prev : ideaData;
       });
-      Alert.alert('Success', 'Invitation sent!');
-      setInviteEmail('');
-      setShowInvite(false);
+      setReplies(prev => {
+        const prevStr = JSON.stringify(prev);
+        const newStr = JSON.stringify(repliesData);
+        return prevStr === newStr ? prev : repliesData;
+      });
     } catch (error) {
-      Alert.alert('Error', error.message);
+      console.error('Fetch error:', error);
+      if (!isPolling) {
+        showToast('Failed to load idea', 'error');
+        navigation.goBack();
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [ideaId]);
+
+  useEffect(() => {
+    fetchData();
+    
+    joinIdea(ideaId);
+    
+    const unsubCreate = onSocketEvent('reply:created', (newReply) => {
+      setReplies(prev => {
+        if (prev.some(r => r.id === newReply.id)) return prev;
+        return [...prev, newReply];
+      });
+    });
+    
+    const unsubDelete = onSocketEvent('reply:deleted', ({ id }) => {
+      setReplies(prev => prev.filter(r => r.id !== id));
+    });
+    
+    return () => {
+      leaveIdea(ideaId);
+      unsubCreate();
+      unsubDelete();
+    };
+  }, [ideaId]);
+
+  const handleDeleteReply = (replyId) => {
+    setConfirmModal({ visible: true, replyId });
+  };
+
+  const confirmDeleteReply = async () => {
+    const replyId = confirmModal.replyId;
+    setConfirmModal({ visible: false, replyId: null });
+    
+    try {
+      await api.delete(`/replies/${replyId}`);
+      fetchData();
+    } catch (error) {
+      console.error('Failed to delete reply:', error);
+    }
+  };
+
+  const handleIconPress = () => {
+    if (idea?.user_id !== user?.id) return;
+    if (Platform.OS === 'web') {
+      iconInputRef.current?.click();
+    } else {
+      pickIconNative();
+    }
+  };
+
+  const pickIconNative = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+    });
+    if (!result.canceled) {
+      uploadIcon(result.assets[0]);
+    }
+  };
+
+  const handleIconWebChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) uploadIcon(file);
+  };
+
+  const uploadIcon = async (file) => {
+    try {
+      await api.uploadFile(`/ideas/${ideaId}/icon`, file);
+      fetchData();
+    } catch (error) {
+      showToast('Failed to upload icon', 'error');
     }
   };
 
@@ -165,20 +336,77 @@ export default function IdeaDetailScreen({ route, navigation }) {
                 })}
               </Text>
             </View>
+            {isOwn && (
+              <TouchableOpacity onPress={() => handleDeleteReply(item.id)} style={styles.deleteButton}>
+                <Ionicons name="trash-outline" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={[styles.replyContent, { color: colors.text }]}>
-            {item.content}
-          </Text>
+          {item.content ? (
+            <Text style={[styles.replyContent, { color: colors.text }]}>
+              {item.content}
+            </Text>
+          ) : null}
           {item.attachments?.filter(Boolean).length > 0 && (
             <View style={styles.attachments}>
-              {item.attachments.filter(Boolean).map((att) => (
-                <View key={att.id} style={[styles.attachment, { borderColor: colors.glassBorder }]}>
-                  <Ionicons name="attach" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.attachmentName, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {att.file_name}
-                  </Text>
-                </View>
-              ))}
+              {item.attachments.filter(Boolean).map((att) => {
+                const isImage = att.file_type?.startsWith('image/');
+                const isVideo = att.file_type?.startsWith('video/');
+                
+                if (isImage) {
+                  return (
+                    <TouchableOpacity 
+                      key={att.id} 
+                      onPress={() => setSelectedImage(att.file_url)}
+                      style={styles.imageAttachment}
+                    >
+                      {Platform.OS === 'web' ? (
+                        <img 
+                          src={att.file_url} 
+                          alt={att.file_name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}
+                        />
+                      ) : (
+                        <Image source={{ uri: att.file_url }} style={styles.attachmentImage} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }
+                
+                if (isVideo) {
+                  return (
+                    <View key={att.id} style={styles.videoAttachment}>
+                      {Platform.OS === 'web' ? (
+                        <video 
+                          src={att.file_url}
+                          controls
+                          style={{ width: '100%', maxHeight: 200, borderRadius: 8 }}
+                        />
+                      ) : (
+                        <View style={[styles.attachment, { borderColor: colors.glassBorder }]}>
+                          <Ionicons name="videocam" size={14} color={colors.textSecondary} />
+                          <Text style={[styles.attachmentName, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {att.file_name}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                }
+                
+                return (
+                  <TouchableOpacity 
+                    key={att.id} 
+                    style={[styles.attachment, { borderColor: colors.glassBorder }]}
+                    onPress={() => Platform.OS === 'web' && window.open(att.file_url, '_blank')}
+                  >
+                    <Ionicons name="document" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.attachmentName, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {att.file_name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </GlassCard>
@@ -188,15 +416,39 @@ export default function IdeaDetailScreen({ route, navigation }) {
 
   const renderHeader = () => (
     <View style={styles.header}>
+      {Platform.OS === 'web' && (
+        <input
+          type="file"
+          ref={iconInputRef}
+          style={{ display: 'none' }}
+          accept="image/*"
+          onChange={handleIconWebChange}
+        />
+      )}
       <Animated.View entering={FadeIn.duration(400)}>
         <GlassCard intensity={40}>
           <View style={styles.ideaHeader}>
-            <View style={[styles.bulbIcon, { backgroundColor: `${colors.accent}20` }]}>
-              <Ionicons name="bulb" size={28} color={colors.accent} />
+            <TouchableOpacity 
+              onPress={handleIconPress}
+              disabled={idea?.user_id !== user?.id}
+              style={[styles.iconContainer, { backgroundColor: `${colors.accent}20` }]}
+            >
+              {idea?.icon_url ? (
+                <Image source={{ uri: idea.icon_url }} style={styles.ideaIcon} />
+              ) : (
+                <Ionicons name="bulb" size={28} color={colors.accent} />
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              {idea?.user_id === user?.id && (
+                <Text style={[styles.tapHint, { color: colors.textTertiary }]}>
+                  Tap icon to customize
+                </Text>
+              )}
+              <Text style={[styles.ideaTitle, { color: colors.text }]}>
+                {idea?.title}
+              </Text>
             </View>
-            <Text style={[styles.ideaTitle, { color: colors.text }]}>
-              {idea?.title}
-            </Text>
           </View>
           {idea?.content && (
             <Text style={[styles.ideaContent, { color: colors.textSecondary }]}>
@@ -221,23 +473,12 @@ export default function IdeaDetailScreen({ route, navigation }) {
       </Animated.View>
 
       {showInvite && (
-        <Animated.View entering={FadeIn.duration(200)} style={styles.inviteSection}>
-          <GlassCard>
-            <Text style={[styles.inviteTitle, { color: colors.text }]}>
-              Invite Collaborator
-            </Text>
-            <TextInput
-              style={[styles.inviteInput, { color: colors.text, borderColor: colors.glassBorder }]}
-              placeholder="Enter email address"
-              placeholderTextColor={colors.textTertiary}
-              value={inviteEmail}
-              onChangeText={setInviteEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <Button title="Send Invite" onPress={handleInvite} />
-          </GlassCard>
-        </Animated.View>
+        <InviteForm 
+          ideaId={ideaId} 
+          colors={colors} 
+          onClose={() => setShowInvite(false)}
+          showToast={showToast}
+        />
       )}
 
       <Text style={[styles.repliesTitle, { color: colors.textSecondary }]}>
@@ -268,7 +509,12 @@ export default function IdeaDetailScreen({ route, navigation }) {
           <Text style={[styles.navTitle, { color: colors.text }]} numberOfLines={1}>
             {idea?.title}
           </Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('ThreadSettings', { ideaId })}
+            style={styles.settingsButton}
+          >
+            <Ionicons name="settings-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
         </View>
 
         <KeyboardAvoidingView 
@@ -283,47 +529,146 @@ export default function IdeaDetailScreen({ route, navigation }) {
             contentContainerStyle={styles.list}
           />
 
-          <View style={[styles.inputContainer, { borderTopColor: colors.glassBorder }]}>
-            {selectedFile && (
-              <View style={[styles.filePreview, { backgroundColor: colors.surface }]}>
-                <Ionicons name="document" size={16} color={colors.accent} />
-                <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
-                  {selectedFile.name}
-                </Text>
-                <TouchableOpacity onPress={() => setSelectedFile(null)}>
-                  <Ionicons name="close" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            )}
-            <View style={styles.inputRow}>
-              <TouchableOpacity onPress={handlePickImage} style={styles.attachButton}>
-                <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handlePickDocument} style={styles.attachButton}>
-                <Ionicons name="attach" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <TextInput
-                style={[styles.replyInput, { color: colors.text, backgroundColor: colors.surface }]}
-                placeholder="Add to the thread..."
-                placeholderTextColor={colors.textTertiary}
-                value={newReply}
-                onChangeText={setNewReply}
-                multiline
+          <ReplyComposer 
+            ideaId={ideaId}
+            colors={colors}
+            onReplySubmitted={fetchData}
+            showToast={showToast}
+          />
+        </KeyboardAvoidingView>
+
+        {/* Image Modal */}
+        {selectedImage && (
+          Platform.OS === 'web' ? (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+              onClick={() => setSelectedImage(null)}
+            >
+              <img 
+                src={selectedImage} 
+                alt="Full size"
+                style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }}
               />
               <TouchableOpacity 
-                onPress={handleSendReply}
-                disabled={(!newReply.trim() && !selectedFile) || sending}
-                style={[
-                  styles.sendButton, 
-                  { backgroundColor: colors.accent },
-                  (!newReply.trim() && !selectedFile) && styles.sendButtonDisabled,
-                ]}
+                style={styles.closeImageButton}
+                onPress={() => setSelectedImage(null)}
               >
-                <Ionicons name="send" size={18} color="#000" />
+                <Ionicons name="close" size={28} color="#fff" />
               </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+            </div>
+          ) : (
+            <Modal visible={!!selectedImage} transparent animationType="fade">
+              <Pressable 
+                style={styles.imageModal}
+                onPress={() => setSelectedImage(null)}
+              >
+                <Image 
+                  source={{ uri: selectedImage }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
+                <TouchableOpacity 
+                  style={styles.closeImageButton}
+                  onPress={() => setSelectedImage(null)}
+                >
+                  <Ionicons name="close" size={28} color="#fff" />
+                </TouchableOpacity>
+              </Pressable>
+            </Modal>
+          )
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {confirmModal.visible && (
+          Platform.OS === 'web' ? (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+              onClick={() => setConfirmModal({ visible: false, replyId: null })}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: colors.glass,
+                  borderRadius: 16,
+                  padding: 24,
+                  maxWidth: 320,
+                  width: '90%',
+                  border: `1px solid ${colors.glassBorder}`,
+                }}
+              >
+                <Text style={[styles.confirmTitle, { color: colors.text }]}>
+                  Delete Reply?
+                </Text>
+                <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+                  This action cannot be undone.
+                </Text>
+                <View style={styles.confirmButtons}>
+                  <TouchableOpacity 
+                    style={[styles.confirmButton, styles.cancelButton, { borderColor: colors.glassBorder }]}
+                    onPress={() => setConfirmModal({ visible: false, replyId: null })}
+                  >
+                    <Text style={[styles.confirmButtonText, { color: colors.text }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.confirmButton, styles.deleteConfirmButton]}
+                    onPress={confirmDeleteReply}
+                  >
+                    <Text style={[styles.confirmButtonText, { color: '#fff' }]}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </div>
+            </div>
+          ) : (
+            <Modal visible={confirmModal.visible} transparent animationType="fade">
+              <View style={styles.modalOverlay}>
+                <View style={[styles.confirmModalContent, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                  <Text style={[styles.confirmTitle, { color: colors.text }]}>
+                    Delete Reply?
+                  </Text>
+                  <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+                    This action cannot be undone.
+                  </Text>
+                  <View style={styles.confirmButtons}>
+                    <TouchableOpacity 
+                      style={[styles.confirmButton, styles.cancelButton, { borderColor: colors.glassBorder }]}
+                      onPress={() => setConfirmModal({ visible: false, replyId: null })}
+                    >
+                      <Text style={[styles.confirmButtonText, { color: colors.text }]}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.confirmButton, styles.deleteConfirmButton]}
+                      onPress={confirmDeleteReply}
+                    >
+                      <Text style={[styles.confirmButtonText, { color: '#fff' }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          )
+        )}
       </SafeAreaView>
     </BackgroundWrapper>
   );
@@ -357,6 +702,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 8,
   },
+  settingsButton: {
+    padding: 8,
+  },
   list: {
     padding: 16,
     paddingBottom: 20,
@@ -369,16 +717,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  bulbIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  iconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  ideaIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+  },
+  tapHint: {
+    fontSize: 10,
+    marginBottom: 2,
   },
   ideaTitle: {
-    flex: 1,
     fontSize: 20,
     fontWeight: '700',
   },
@@ -464,13 +821,16 @@ const styles = StyleSheet.create({
   replyTime: {
     fontSize: 11,
   },
+  deleteButton: {
+    padding: 4,
+  },
   replyContent: {
     fontSize: 14,
     lineHeight: 20,
   },
   attachments: {
     marginTop: 8,
-    gap: 4,
+    gap: 8,
   },
   attachment: {
     flexDirection: 'row',
@@ -484,6 +844,20 @@ const styles = StyleSheet.create({
   attachmentName: {
     fontSize: 12,
     flex: 1,
+  },
+  imageAttachment: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  attachmentImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  videoAttachment: {
+    maxWidth: 280,
   },
   inputContainer: {
     padding: 12,
@@ -526,5 +900,65 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  imageModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.8,
+  },
+  closeImageButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    padding: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmModalContent: {
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 320,
+    width: '90%',
+    borderWidth: 1,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    marginBottom: 24,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  deleteConfirmButton: {
+    backgroundColor: '#ef4444',
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

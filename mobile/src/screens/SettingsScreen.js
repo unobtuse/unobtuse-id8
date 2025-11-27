@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
-  Alert,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,40 +18,109 @@ import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
+import { subscribeToPush, isPushSupported, checkPushSubscription } from '../services/pushNotifications';
 
 export default function SettingsScreen({ navigation }) {
   const { user, signOut } = useAuth();
-  const { colors, theme, toggleTheme, backgroundUrl, updateBackground } = useTheme();
+  const { colors, theme, toggleTheme, backgroundUrl, backgroundType, updateBackground } = useTheme();
+  const { showToast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [testingNotification, setTestingNotification] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const fileInputRef = useRef(null);
+  
+  const pushSupported = Platform.OS === 'web' && isPushSupported();
+
+  useEffect(() => {
+    // Check if notifications are actually subscribed (not just permission)
+    const checkSubscription = async () => {
+      if (Platform.OS === 'web') {
+        const status = await checkPushSubscription();
+        setNotificationsEnabled(status.subscribed && status.permission === 'granted');
+        console.log('Push subscription status:', status);
+      }
+    };
+    checkSubscription();
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    const result = await subscribeToPush();
+    if (result.success) {
+      setNotificationsEnabled(true);
+      showToast('Notifications enabled!', 'success');
+    } else {
+      showToast(result.error || 'Failed to enable notifications', 'error');
+    }
+  };
+
+  const handleTestNotification = async () => {
+    setTestingNotification(true);
+    try {
+      await api.post('/push/test');
+      showToast('Test notification sent! Check your browser/device.', 'success');
+    } catch (error) {
+      showToast('Failed to send test notification', 'error');
+    } finally {
+      setTestingNotification(false);
+    }
+  };
 
   const handlePickBackground = async () => {
+    if (Platform.OS === 'web') {
+      fileInputRef.current?.click();
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [9, 16],
+      mediaTypes: ['images', 'videos'],
+      quality: 1,
     });
 
     if (!result.canceled) {
-      setUploading(true);
-      try {
-        const asset = result.assets[0];
-        const isVideo = asset.type === 'video';
-        
-        const response = await api.uploadFile('/settings/background', {
-          uri: asset.uri,
+      await uploadBackgroundFile(result.assets[0]);
+    }
+  };
+
+  const handleWebFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await uploadBackgroundFile(file);
+    }
+  };
+
+  const uploadBackgroundFile = async (file) => {
+    setUploading(true);
+    try {
+      let fileToUpload;
+      
+      if (file instanceof File) {
+        // Web file
+        fileToUpload = file;
+      } else {
+        // React Native asset
+        const isVideo = file.type === 'video' || file.mimeType?.startsWith('video/');
+        fileToUpload = {
+          uri: file.uri,
           name: isVideo ? 'background.mp4' : 'background.jpg',
           mimeType: isVideo ? 'video/mp4' : 'image/jpeg',
-        });
-        
-        await updateBackground(response.background_url, response.background_type);
-        Alert.alert('Success', 'Background updated!');
-      } catch (error) {
-        Alert.alert('Error', 'Failed to upload background');
-      } finally {
-        setUploading(false);
+        };
       }
+      
+      const response = await api.uploadFile('/settings/background', fileToUpload);
+      await updateBackground(response.background_url, response.background_type);
+      
+      if (Platform.OS === 'web') {
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      showToast('Failed to upload background', 'error');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -59,25 +128,32 @@ export default function SettingsScreen({ navigation }) {
     try {
       await api.delete('/settings/background');
       await updateBackground(null, 'image');
-      Alert.alert('Success', 'Background removed');
+      showToast('Background removed', 'success');
     } catch (error) {
-      Alert.alert('Error', 'Failed to remove background');
+      showToast('Failed to remove background', 'error');
     }
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut },
-      ]
-    );
+    setConfirmSignOut(true);
+  };
+
+  const confirmSignOutAction = () => {
+    setConfirmSignOut(false);
+    signOut();
   };
 
   return (
     <BackgroundWrapper>
+      {Platform.OS === 'web' && (
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept="image/*,video/*"
+          onChange={handleWebFileChange}
+        />
+      )}
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
@@ -150,10 +226,30 @@ export default function SettingsScreen({ navigation }) {
               
               {backgroundUrl && (
                 <View style={styles.backgroundPreview}>
-                  <Image 
-                    source={{ uri: backgroundUrl }} 
-                    style={styles.backgroundImage}
-                  />
+                  {backgroundType === 'video' ? (
+                    Platform.OS === 'web' ? (
+                      <video 
+                        src={backgroundUrl} 
+                        style={{ width: '100%', height: 120, borderRadius: 8, objectFit: 'cover' }}
+                        muted
+                        autoPlay
+                        loop
+                        playsInline
+                      />
+                    ) : (
+                      <View style={[styles.backgroundImage, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="videocam" size={32} color={colors.textSecondary} />
+                        <Text style={[styles.settingHint, { color: colors.textSecondary, marginTop: 4 }]}>
+                          Video Background
+                        </Text>
+                      </View>
+                    )
+                  ) : (
+                    <Image 
+                      source={{ uri: backgroundUrl }} 
+                      style={styles.backgroundImage}
+                    />
+                  )}
                 </View>
               )}
               
@@ -176,7 +272,66 @@ export default function SettingsScreen({ navigation }) {
             </GlassCard>
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.delay(300).duration(400)}>
+          {Platform.OS === 'web' && (
+            <Animated.View entering={FadeInUp.delay(300).duration(400)}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                Notifications
+              </Text>
+              <GlassCard>
+                <View style={styles.settingRow}>
+                  <View style={styles.settingInfo}>
+                    <Ionicons name="notifications-outline" size={22} color={colors.accent} />
+                    <View>
+                      <Text style={[styles.settingLabel, { color: colors.text }]}>
+                        Push Notifications
+                      </Text>
+                      <Text style={[styles.settingHint, { color: colors.textTertiary }]}>
+                        {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                      </Text>
+                    </View>
+                  </View>
+                  {!notificationsEnabled && pushSupported && (
+                    <Button
+                      title="Enable"
+                      onPress={handleEnableNotifications}
+                      style={{ paddingHorizontal: 16, paddingVertical: 8 }}
+                    />
+                  )}
+                </View>
+                
+                {notificationsEnabled && (
+                  <>
+                    <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+                    <View style={styles.settingRow}>
+                      <View style={styles.settingInfo}>
+                        <Ionicons name="paper-plane-outline" size={22} color={colors.accent} />
+                        <Text style={[styles.settingLabel, { color: colors.text }]}>
+                          Test Notification
+                        </Text>
+                      </View>
+                      <Button
+                        title="Send Test"
+                        variant="outline"
+                        onPress={handleTestNotification}
+                        loading={testingNotification}
+                        style={{ paddingHorizontal: 16, paddingVertical: 8 }}
+                      />
+                    </View>
+                  </>
+                )}
+                
+                {!pushSupported && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={[styles.settingHint, { color: colors.textTertiary }]}>
+                      Add ID8 to your home screen to enable push notifications.
+                    </Text>
+                  </View>
+                )}
+              </GlassCard>
+            </Animated.View>
+          )}
+
+          <Animated.View entering={FadeInUp.delay(400).duration(400)}>
             <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
               About
             </Text>
@@ -214,6 +369,31 @@ export default function SettingsScreen({ navigation }) {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+
+      {confirmSignOut && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>Sign Out?</Text>
+            <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+              Are you sure you want to sign out?
+            </Text>
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmButton, styles.cancelButton, { borderColor: colors.glassBorder }]}
+                onPress={() => setConfirmSignOut(false)}
+              >
+                <Text style={[styles.confirmButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmButton, styles.signOutButton]}
+                onPress={confirmSignOutAction}
+              >
+                <Text style={[styles.confirmButtonText, { color: '#fff' }]}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </BackgroundWrapper>
   );
 }
@@ -330,5 +510,55 @@ const styles = StyleSheet.create({
   signOutSection: {
     marginTop: 32,
     marginBottom: 40,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  confirmModal: {
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 320,
+    width: '90%',
+    borderWidth: 1,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  signOutButton: {
+    backgroundColor: '#ef4444',
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

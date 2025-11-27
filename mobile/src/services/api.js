@@ -66,14 +66,22 @@ class ApiService {
     const url = `${API_URL}${endpoint}`;
     const formData = new FormData();
     
-    formData.append('file', {
-      uri: file.uri,
-      type: file.mimeType || 'application/octet-stream',
-      name: file.name || 'file',
-    });
+    // Handle web File objects vs React Native file objects
+    if (file instanceof File || file instanceof Blob) {
+      formData.append('file', file, file.name || 'file');
+    } else {
+      // React Native format
+      formData.append('file', {
+        uri: file.uri,
+        type: file.mimeType || 'application/octet-stream',
+        name: file.name || 'file',
+      });
+    }
 
     Object.keys(additionalData).forEach(key => {
-      formData.append(key, additionalData[key]);
+      if (additionalData[key] !== undefined && additionalData[key] !== null) {
+        formData.append(key, String(additionalData[key]));
+      }
     });
 
     const response = await fetch(url, {
