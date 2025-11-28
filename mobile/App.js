@@ -15,6 +15,7 @@ import IdeaDetailScreen from './src/screens/IdeaDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import InvitationsScreen from './src/screens/InvitationsScreen';
 import ThreadSettingsScreen from './src/screens/ThreadSettingsScreen';
+import FriendsScreen from './src/screens/FriendsScreen';
 
 // Set default font for all Text and TextInput components on native
 if (Platform.OS !== 'web') {
@@ -90,6 +91,11 @@ function AppNavigator() {
             <Stack.Screen 
               name="ThreadSettings" 
               component={ThreadSettingsScreen}
+              options={{ animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen 
+              name="Friends" 
+              component={FriendsScreen}
               options={{ animation: 'slide_from_bottom' }}
             />
           </>

@@ -4,32 +4,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile viewport fix */
+:root {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+}
+
 /* Apply Inter font globally - override React Native Web defaults */
-html,
-body,
-#root {
+html {
     font-family: 'Inter', sans-serif !important;
     height: 100%;
-    /* Ensure full height on mobile browsers */
-    min-height: 100dvh;
+    height: -webkit-fill-available;
     width: 100%;
-    /* Prevent scrolling on the body itself, let React Native handle it */
+    background-color: #000;
     overflow: hidden;
-    /* Fix for iOS overscroll */
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+body {
+    font-family: 'Inter', sans-serif !important;
+    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    /* Mask any potential gaps with black background */
     background-color: #000;
-    /* Prevent rubber-banding */
     overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    /* Support for notched devices */
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
 }
 
 #root {
+    font-family: 'Inter', sans-serif !important;
     display: flex;
     flex-direction: column;
+    flex: 1;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
 }
 
 /* Apply to text elements but exclude icon fonts */

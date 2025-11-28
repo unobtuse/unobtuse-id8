@@ -156,6 +156,95 @@ router.delete('/background', authenticateToken, async (req, res) => {
     }
 });
 
+// Update screen name
+router.patch('/screen-name', authenticateToken, async (req, res) => {
+    try {
+        const {
+            screenName
+        } = req.body;
+
+        if (!screenName) {
+            // Allow clearing screen name
+            const result = await pool.query(
+                `UPDATE users SET screen_name = NULL, updated_at = NOW()
+                 WHERE id = $1 RETURNING id, name, email, avatar_url, screen_name`,
+                [req.user.id]
+            );
+            return res.json(result.rows[0]);
+        }
+
+        // Validate screen name format (alphanumeric, underscores, 3-30 chars)
+        const cleanName = screenName.startsWith('@') ? screenName.substring(1) : screenName;
+        if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanName)) {
+            return res.status(400).json({
+                error: 'Screen name must be 3-30 characters, using only letters, numbers, and underscores'
+            });
+        }
+
+        // Check if already taken
+        const existing = await pool.query(
+            `SELECT id FROM users WHERE LOWER(screen_name) = LOWER($1) AND id != $2`,
+            [cleanName, req.user.id]
+        );
+
+        if (existing.rows.length > 0) {
+            return res.status(400).json({
+                error: 'Screen name already taken'
+            });
+        }
+
+        const result = await pool.query(
+            `UPDATE users SET screen_name = $1, updated_at = NOW()
+             WHERE id = $2 RETURNING id, name, email, avatar_url, screen_name`,
+            [cleanName, req.user.id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Update screen name error:', error);
+        res.status(500).json({
+            error: 'Failed to update screen name'
+        });
+    }
+});
+
+// Check screen name availability
+router.get('/screen-name/check', authenticateToken, async (req, res) => {
+    try {
+        const {
+            name
+        } = req.query;
+        if (!name) {
+            return res.status(400).json({
+                error: 'Name required'
+            });
+        }
+
+        const cleanName = name.startsWith('@') ? name.substring(1) : name;
+
+        if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanName)) {
+            return res.json({
+                available: false,
+                reason: 'Invalid format'
+            });
+        }
+
+        const existing = await pool.query(
+            `SELECT id FROM users WHERE LOWER(screen_name) = LOWER($1) AND id != $2`,
+            [cleanName, req.user.id]
+        );
+
+        res.json({
+            available: existing.rows.length === 0
+        });
+    } catch (error) {
+        console.error('Check screen name error:', error);
+        res.status(500).json({
+            error: 'Failed to check screen name'
+        });
+    }
+});
+
 // Upload avatar
 router.post('/avatar', authenticateToken, upload.single('file'), async (req, res) => {
     try {
@@ -208,6 +297,35 @@ router.post('/avatar', authenticateToken, upload.single('file'), async (req, res
         console.error('Upload avatar error:', error);
         res.status(500).json({
             error: 'Failed to upload avatar'
+        });
+    }
+});
+
+// Update API Keys
+router.patch('/api-keys', authenticateToken, async (req, res) => {
+    try {
+        const {
+            openaiKey,
+            anthropicKey,
+            geminiKey
+        } = req.body;
+
+        const result = await pool.query(
+            `UPDATE users SET 
+                openai_key = $1, 
+                anthropic_key = $2, 
+                gemini_key = $3, 
+                updated_at = NOW()
+             WHERE id = $4 
+             RETURNING id, name, email, avatar_url, screen_name, openai_key, anthropic_key, gemini_key`,
+            [openaiKey, anthropicKey, geminiKey, req.user.id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Update API keys error:', error);
+        res.status(500).json({
+            error: 'Failed to update API keys'
         });
     }
 });

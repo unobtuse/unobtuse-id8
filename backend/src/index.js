@@ -15,6 +15,8 @@ const collaboratorsRoutes = require('./routes/collaborators');
 const settingsRoutes = require('./routes/settings');
 const pushRoutes = require('./routes/push');
 const logsRoutes = require('./routes/logs');
+const friendsRoutes = require('./routes/friends');
+const stickersRoutes = require('./routes/stickers');
 
 const app = express();
 const server = createServer(app);
@@ -39,6 +41,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/og', require('./routes/og'));
+app.use('/api/friends', friendsRoutes);
+app.use('/api/stickers', stickersRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

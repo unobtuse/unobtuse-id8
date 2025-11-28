@@ -218,7 +218,6 @@ export default function AuthScreen() {
                     styles.input,
                     {
                         color: colors.text,
-                        borderColor: colors.glassBorder,
                         backgroundColor: `${colors.glass}50`,
                     },
                 ]
@@ -242,7 +241,6 @@ export default function AuthScreen() {
                     styles.input,
                     {
                         color: colors.text,
-                        borderColor: colors.glassBorder,
                         backgroundColor: `${colors.glass}50`,
                     },
                 ]
@@ -324,7 +322,6 @@ export default function AuthScreen() {
                     styles.input,
                     {
                         color: colors.text,
-                        borderColor: colors.glassBorder,
                         backgroundColor: `${colors.glass}50`,
                     },
                 ]
@@ -345,7 +342,6 @@ export default function AuthScreen() {
                     styles.input,
                     {
                         color: colors.text,
-                        borderColor: colors.glassBorder,
                         backgroundColor: `${colors.glass}50`,
                     },
                 ]
@@ -369,7 +365,6 @@ export default function AuthScreen() {
                     styles.input,
                     {
                         color: colors.text,
-                        borderColor: colors.glassBorder,
                         backgroundColor: `${colors.glass}50`,
                     },
                 ]
@@ -607,13 +602,12 @@ export default function AuthScreen() {
         },
         input: {
             width: '100%',
-            borderWidth: 1,
             borderRadius: 16,
             paddingHorizontal: 20,
             paddingVertical: 16,
             fontSize: 16,
             marginBottom: 16,
-            marginTop: 8, // Add margin above inputs
+            marginTop: 8,
         },
         switchMode: {
             marginTop: 24, // Increased margin

@@ -19,6 +19,7 @@ import {
 import {
     Ionicons
 } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import * as ImagePicker from 'expo-image-picker';
 import Animated, {
     FadeIn,
@@ -68,6 +69,12 @@ export default function SettingsScreen({
     const [confirmSignOut, setConfirmSignOut] = useState(false);
     const [testingNotification, setTestingNotification] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [screenName, setScreenName] = useState(user?.screen_name || '');
+    const [screenNameEditing, setScreenNameEditing] = useState(false);
+    const [savingScreenName, setSavingScreenName] = useState(false);
+
+    // AI API Keys State
+    const [openaiKey, setOpenaiKey] = useState(user?.openai_key || '');
     const fileInputRef = useRef(null);
     const avatarInputRef = useRef(null);
 
@@ -109,7 +116,7 @@ export default function SettingsScreen({
 
     const handlePickBackground = async () => {
         if (Platform.OS === 'web') {
-            fileInputRef.current ?.click();
+            fileInputRef.current?.click();
             return;
         }
 
@@ -125,7 +132,7 @@ export default function SettingsScreen({
 
     const handlePickAvatar = async () => {
         if (Platform.OS === 'web') {
-            avatarInputRef.current ?.click();
+            avatarInputRef.current?.click();
             return;
         }
 
@@ -142,14 +149,14 @@ export default function SettingsScreen({
     };
 
     const handleWebFileChange = async (event) => {
-        const file = event.target.files ?. [0];
+        const file = event.target.files?. [0];
         if (file) {
             await uploadBackgroundFile(file);
         }
     };
 
     const handleWebAvatarChange = async (event) => {
-        const file = event.target.files ?. [0];
+        const file = event.target.files?. [0];
         if (file) {
             await uploadAvatarFile(file);
         }
@@ -165,7 +172,7 @@ export default function SettingsScreen({
                 fileToUpload = file;
             } else {
                 // React Native asset
-                const isVideo = file.type === 'video' || file.mimeType ?.startsWith('video/');
+                const isVideo = file.type === 'video' || file.mimeType?.startsWith('video/');
                 fileToUpload = {
                     uri: file.uri,
                     name: isVideo ? 'background.mp4' : 'background.jpg',
@@ -239,6 +246,31 @@ export default function SettingsScreen({
         signOut();
     };
 
+    const handleShareApp = async () => {
+        try {
+            const result = await Share.share({
+                message: 'Check out this awesome app!',
+                url: 'https://your-app-url.com', // Replace with your app's actual URL
+                title: 'Share App',
+            });
+
+            if (result.action === Share.sharedAction) {
+                if (result.activityType) {
+                    // shared with activity type of result.activityType
+                    showToast('App shared successfully!', 'success');
+                } else {
+                    // shared
+                    showToast('App shared successfully!', 'success');
+                }
+            } else if (result.action === Share.dismissedAction) {
+                // dismissed
+                showToast('Share dismissed', 'info');
+            }
+        } catch (error) {
+            showToast('Error sharing app: ' + error.message, 'error');
+        }
+    };
+
     return ( <
             BackgroundWrapper > {
                 Platform.OS === 'web' && ( <
@@ -271,8 +303,7 @@ export default function SettingsScreen({
                     onChange = {
                         handleWebAvatarChange
                     }
-                    /> <
-                    />
+                    /> < / >
                 )
             } <
             SafeAreaView style = {
@@ -331,7 +362,7 @@ export default function SettingsScreen({
             GlassCard style = {
                 styles.profileCard
             } > {
-                user ?.avatar_url ? ( <
+                user?.avatar_url ? ( <
                     Image source = {
                         {
                             uri: user.avatar_url
@@ -351,7 +382,7 @@ export default function SettingsScreen({
                     Text style = {
                         styles.avatarText
                     } > {
-                        user ?.name ?.charAt(0) ?.toUpperCase()
+                        user?.name?.charAt(0)?.toUpperCase()
                     } <
                     /Text> <
                     View style = {
@@ -377,14 +408,18 @@ export default function SettingsScreen({
                     /View>
                 )
             } <
-            View >
+            View style = {
+                {
+                    alignItems: 'center'
+                }
+            } >
             <
             Text style = {
                 [styles.userName, {
                     color: colors.text
                 }]
             } > {
-                user ?.name
+                user?.name
             } <
             /Text> <
             Text style = {
@@ -392,7 +427,7 @@ export default function SettingsScreen({
                     color: colors.textSecondary
                 }]
             } > {
-                user ?.email
+                user?.email
             } <
             /Text> <
             Text style = {
@@ -458,7 +493,7 @@ export default function SettingsScreen({
             trackColor = {
                 {
                     false: colors.surface,
-                    true: colors.accent
+                    true: theme === 'dark' ? '#52525b' : colors.accent
                 }
             }
             thumbColor = "#fff" /
@@ -827,6 +862,62 @@ color = {
 View > <
     /TouchableOpacity> < /
 GlassCard > <
+    /Animated.View>
+
+    <
+    Animated.View entering = {
+        FadeInUp.delay(500).duration(400)
+    } >
+    <
+    Text style = {
+        [styles.sectionTitle, {
+            color: colors.textSecondary
+        }]
+    } > Share App < /Text> <
+    GlassCard >
+    <
+    View style = {
+        {
+            alignItems: 'center',
+            padding: 20
+        }
+    } >
+    <
+    View style = {
+        {
+            padding: 10,
+            backgroundColor: 'white',
+            borderRadius: 10
+        }
+    } >
+    <
+    QRCode value = "https://id8.unobtuse.com"
+size = {
+    150
+}
+/> <
+/View> <
+Text style = {
+        {
+            marginTop: 16,
+            color: colors.text,
+            fontSize: 16,
+            fontWeight: '600'
+        }
+    } >
+    Scan to Download <
+    /Text> <
+    Text style = {
+        {
+            marginTop: 4,
+            color: colors.textSecondary,
+            fontSize: 14
+        }
+    } >
+    id8.unobtuse.com <
+    /Text> <
+    /View> <
+    /GlassCard> <
     /Animated.View>
 
     <

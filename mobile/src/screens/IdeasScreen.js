@@ -315,6 +315,22 @@ export default function IdeasScreen({
                 styles.iconButton
             }
             onPress = {
+                () => navigation.navigate('Friends')
+            } >
+            <
+            Ionicons name = "notifications-outline"
+            size = {
+                24
+            }
+            color = {
+                colors.text
+            }
+            /> < /
+            TouchableOpacity > <
+            TouchableOpacity style = {
+                styles.iconButton
+            }
+            onPress = {
                 () => navigation.navigate('Settings')
             } > {
                 user ?.avatar_url ? ( <

@@ -54,14 +54,20 @@ const initUnicornStudio = () => {
 };
 
 export default function BackgroundWrapper({
-    children
+    children,
+    overrideBackgroundUrl,
+    overrideBackgroundType
 }) {
     const {
         colors,
-        backgroundUrl,
-        backgroundType,
+        backgroundUrl: userBackgroundUrl,
+        backgroundType: userBackgroundType,
         theme
     } = useTheme();
+    
+    // Use override (thread background) if provided, otherwise use user's background
+    const backgroundUrl = overrideBackgroundUrl !== undefined ? overrideBackgroundUrl : userBackgroundUrl;
+    const backgroundType = overrideBackgroundUrl !== undefined ? (overrideBackgroundType || 'image') : userBackgroundType;
 
     useEffect(() => {
         if (Platform.OS === "web") {

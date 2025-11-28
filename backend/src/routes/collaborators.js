@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../config/db');
 const { authenticateToken } = require('../middleware/auth');
 const { sendInviteEmail } = require('../config/email');
+const { sendPushNotification } = require('../config/push');
 
 const router = express.Router();
 
@@ -71,7 +72,21 @@ router.patch('/:id/permissions', authenticateToken, async (req, res) => {
 // Invite collaborator
 router.post('/invite', authenticateToken, async (req, res) => {
   try {
-    const { ideaId, email, role } = req.body;
+    let { ideaId, email, role } = req.body;
+    
+    // Support @username invites
+    let inviteEmail = email;
+    if (email && email.startsWith('@')) {
+      const screenName = email.substring(1);
+      const userByScreen = await pool.query(
+        `SELECT email FROM users WHERE LOWER(screen_name) = LOWER($1)`,
+        [screenName]
+      );
+      if (userByScreen.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found with that screen name' });
+      }
+      inviteEmail = userByScreen.rows[0].email;
+    }
     
     // Check if user is owner or has invite permission
     const ideaCheck = await pool.query(
@@ -111,13 +126,13 @@ router.post('/invite', authenticateToken, async (req, res) => {
     const inviterName = inviterQuery.rows[0]?.name || 'Someone';
     
     // Check if user exists (case-insensitive)
-    const userCheck = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [email]);
+    const userCheck = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [inviteEmail]);
     const userId = userCheck.rows.length > 0 ? userCheck.rows[0].id : null;
     
     // Check for existing invitation (case-insensitive email check)
     const existingCheck = await pool.query(
       `SELECT id FROM collaborators WHERE idea_id = $1 AND (user_id = $2 OR LOWER(invite_email) = LOWER($3))`,
-      [ideaId, userId, email]
+      [ideaId, userId, inviteEmail]
     );
     
     if (existingCheck.rows.length > 0) {
@@ -127,11 +142,23 @@ router.post('/invite', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO collaborators (idea_id, user_id, invited_by, role, invite_email, status)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [ideaId, userId, req.user.id, role || 'contributor', email, userId ? 'pending' : 'pending']
+      [ideaId, userId, req.user.id, role || 'contributor', inviteEmail, userId ? 'pending' : 'pending']
     );
     
     // Send invite email
-    sendInviteEmail(email, inviterName, idea.title);
+    sendInviteEmail(inviteEmail, inviterName, idea.title);
+    
+    // Send push notification if user exists
+    if (userId) {
+      const payload = {
+        title: 'New Thread Invitation',
+        body: `${inviterName} invited you to collaborate on "${idea.title}"`,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { ideaId, type: 'invite' },
+      };
+      sendPushNotification(userId, payload);
+    }
     
     res.status(201).json(result.rows[0]);
   } catch (error) {

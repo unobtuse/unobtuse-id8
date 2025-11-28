@@ -17,6 +17,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import BackgroundWrapper from '../components/BackgroundWrapper';
 import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
+import ImageCropper from '../components/ImageCropper';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../services/api';
@@ -35,6 +36,7 @@ export default function ThreadSettingsScreen({ route, navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const iconInputRef = useRef(null);
   const bgInputRef = useRef(null);
+  const [iconCropFile, setIconCropFile] = useState(null);
 
   const isOwner = idea?.user_id === user?.id;
 
@@ -122,7 +124,9 @@ export default function ThreadSettingsScreen({ route, navigation }) {
   const pickIconNative = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 1,
+      quality: 0.9,
+      allowsEditing: true,
+      aspect: [1, 1],
     });
     if (!result.canceled) {
       uploadIcon(result.assets[0]);
@@ -131,7 +135,15 @@ export default function ThreadSettingsScreen({ route, navigation }) {
 
   const handleIconWebChange = (event) => {
     const file = event.target.files?.[0];
-    if (file) uploadIcon(file);
+    if (file) {
+      setIconCropFile(file);
+      if (iconInputRef.current) iconInputRef.current.value = '';
+    }
+  };
+
+  const handleIconCrop = async (croppedFile) => {
+    setIconCropFile(null);
+    await uploadIcon(croppedFile);
   };
 
   const uploadIcon = async (file) => {
@@ -708,6 +720,15 @@ export default function ThreadSettingsScreen({ route, navigation }) {
             </TouchableOpacity>
           </div>
         </div>
+      )}
+
+      {iconCropFile && Platform.OS === 'web' && (
+        <ImageCropper
+          file={iconCropFile}
+          onCrop={handleIconCrop}
+          onCancel={() => setIconCropFile(null)}
+          aspectRatio={1}
+        />
       )}
     </BackgroundWrapper>
   );
