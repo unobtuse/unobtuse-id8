@@ -14,19 +14,32 @@ const upload = multer({
 // Create stickers table if not exists
 const initStickersTable = async () => {
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS stickers (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        name VARCHAR(100),
-        file_url TEXT NOT NULL,
-        file_type VARCHAR(50) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
+    // Check if table exists and has wrong schema
+    const tableCheck = await pool.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'stickers' AND column_name = 'user_id'
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stickers_user ON stickers(user_id)`);
+    
+    // If table exists with wrong type or doesn't exist, recreate
+    if (tableCheck.rows.length === 0 || tableCheck.rows[0].data_type === 'integer') {
+      console.log('[Stickers] Creating/recreating stickers table with UUID user_id');
+      await pool.query(`DROP TABLE IF EXISTS stickers CASCADE`);
+      await pool.query(`
+        CREATE TABLE stickers (
+          id SERIAL PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          name VARCHAR(100),
+          file_url TEXT NOT NULL,
+          file_type VARCHAR(50) NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stickers_user ON stickers(user_id)`);
+      console.log('[Stickers] Table created successfully');
+    }
   } catch (error) {
-    console.error('Failed to create stickers table:', error);
+    console.error('[Stickers] Failed to create stickers table:', error);
   }
 };
 initStickersTable();
@@ -42,6 +55,25 @@ router.get('/', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get stickers error:', error);
     res.status(500).json({ error: 'Failed to fetch stickers' });
+  }
+});
+
+// Search stickers by name (for autocomplete)
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.length < 1) {
+      return res.json([]);
+    }
+    
+    const result = await pool.query(
+      `SELECT * FROM stickers WHERE user_id = $1 AND LOWER(name) LIKE LOWER($2) ORDER BY name LIMIT 10`,
+      [req.user.id, `%${q}%`]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Search stickers error:', error);
+    res.status(500).json({ error: 'Failed to search stickers' });
   }
 });
 
