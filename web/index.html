@@ -18,6 +18,12 @@
       }
       /* These styles make the root element full-height */
       #root {
+        /* Override React Native Web Switch default thumb color */
+      }
+      [role="switch"][aria-checked="true"] > div > div {
+        background-color: #C7B500 !important;
+      }
+      
         display: flex;
         height: 100%;
         flex: 1;
@@ -34,6 +40,6 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/AppEntry-e1332e5f6fc3e6a192e61fb1981119a5.js" defer></script>
+  <script src="/_expo/static/js/web/AppEntry-0ea8e2cd9bc05eda548a85bbc794c114.js" defer></script>
 </body>
 </html>

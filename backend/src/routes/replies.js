@@ -89,6 +89,28 @@ router.post('/read', authenticateToken, async (req, res) => {
       );
     }
     
+    // Emit real-time read receipt update
+    if (replyIds.length > 0) {
+      const replyData = await pool.query(
+        `SELECT DISTINCT idea_id FROM idea_replies WHERE id = ANY($1)`,
+        [replyIds]
+      );
+      
+      if (replyData.rows.length > 0) {
+        const ideaId = replyData.rows[0].idea_id;
+        const userInfo = await pool.query(
+          `SELECT id as user_id, name, avatar_url FROM users WHERE id = $1`,
+          [req.user.id]
+        );
+        
+        emitToIdea(ideaId, 'reply:read', {
+          replyIds,
+          user: userInfo.rows[0],
+          readAt: new Date().toISOString()
+        });
+      }
+    }
+    
     res.json({ success: true });
   } catch (error) {
     console.error('Mark read error:', error);

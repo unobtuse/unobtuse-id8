@@ -240,8 +240,8 @@ export default function EmojiPicker({
         } > {
             title
         } <
-        /Text> <
-        /View>
+        /Text> < /
+        View >
     );
 
     const renderItem = ({
@@ -265,8 +265,8 @@ export default function EmojiPicker({
                     styles.emoji
                 } > {
                     emoji
-                } < /Text> <
-                /TouchableOpacity>
+                } < /Text> < /
+                TouchableOpacity >
             ))
         } <
         /View>
@@ -283,9 +283,9 @@ export default function EmojiPicker({
                     borderTopColor: colors.glassBorder
                 },
             ]
-        } >
-        {
-            /* Search Bar */ } <
+        } > {
+            /* Search Bar */
+        } <
         View style = {
             [styles.searchContainer, {
                 borderBottomColor: colors.glassBorder
@@ -337,15 +337,16 @@ export default function EmojiPicker({
         color = {
             colors.textSecondary
         }
-        /> <
-        /TouchableOpacity> <
+        /> < /
+        TouchableOpacity > <
         /View>
 
         <
         View style = {
             styles.contentContainer
         } > {
-            /* Sidebar */ } <
+            /* Sidebar */
+        } <
         View style = {
             [styles.sidebar, {
                 borderRightColor: colors.glassBorder,
@@ -373,14 +374,15 @@ export default function EmojiPicker({
                     styles.sidebarIcon
                 } > {
                     cat.icon
-                } < /Text> <
-                /TouchableOpacity>
+                } < /Text> < /
+                TouchableOpacity >
             ))
         } <
         /View>
 
         {
-            /* Main List */ } <
+            /* Main List */
+        } <
         SectionList ref = {
             sectionListRef
         }
@@ -414,8 +416,8 @@ export default function EmojiPicker({
         showsVerticalScrollIndicator = {
             true
         }
-        /> <
-        /View> <
+        /> < /
+        View > <
         /View>
     );
 }
@@ -453,13 +455,13 @@ const styles = StyleSheet.create({
         flexDirection: "row",
     },
     sidebar: {
-        width: 48,
+        width: 40,
         borderRightWidth: 1,
         alignItems: "center",
         paddingVertical: 8,
     },
     sidebarBtn: {
-        width: 48,
+        width: 40,
         height: 48,
         alignItems: "center",
         justifyContent: "center",

@@ -476,8 +476,8 @@ export default function ThreadSettingsScreen({ route, navigation }) {
                 <Switch
                   value={notificationsEnabled}
                   onValueChange={toggleNotifications}
-                  trackColor={{ false: colors.surface, true: colors.accent }}
-                  thumbColor="#000"
+                  trackColor={{ false: colors.surface, true: "#52525b" }}
+                  thumbColor={notificationsEnabled ? colors.accent : "#fff"}
                 />
               </View>
             </GlassCard>
@@ -517,8 +517,8 @@ export default function ThreadSettingsScreen({ route, navigation }) {
                   <Switch
                     value={idea?.allow_member_invites || false}
                     onValueChange={toggleMemberInvites}
-                    trackColor={{ false: colors.surface, true: colors.accent }}
-                    thumbColor="#000"
+                    trackColor={{ false: colors.surface, true: "#52525b" }}
+                    thumbColor={idea?.allow_member_invites ? colors.accent : "#fff"}
                   />
                 </View>
               </GlassCard>
@@ -685,9 +685,9 @@ export default function ThreadSettingsScreen({ route, navigation }) {
                               }
                               trackColor={{
                                 false: colors.surface,
-                                true: colors.accent,
+                                true: "#52525b",
                               }}
-                              thumbColor="#000"
+                              thumbColor={collab.can_invite ? colors.accent : "#fff"}
                               style={{ transform: [{ scale: 0.7 }] }}
                             />
                           </View>
@@ -708,9 +708,9 @@ export default function ThreadSettingsScreen({ route, navigation }) {
                             }
                             trackColor={{
                               false: colors.surface,
-                              true: colors.accent,
+                              true: "#52525b",
                             }}
-                            thumbColor="#000"
+                            thumbColor={collab.can_change_background ? colors.accent : "#fff"}
                             style={{ transform: [{ scale: 0.7 }] }}
                           />
                         </View>
@@ -882,7 +882,9 @@ export default function ThreadSettingsScreen({ route, navigation }) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.7)",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

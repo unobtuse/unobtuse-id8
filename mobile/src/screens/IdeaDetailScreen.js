@@ -2,6 +2,7 @@ import React, {
     useState,
     useEffect,
     useCallback,
+    useMemo,
     memo,
     useRef
 } from "react";
@@ -565,15 +566,56 @@ export default function IdeaDetailScreen({
     const iconInputRef = useRef(null);
     const flatListRef = useRef(null);
 
-    // Auto-scroll to bottom when replies change
+    // Organize replies into nested structure
+    const { topLevelReplies, childRepliesMap } = useMemo(() => {
+        const childMap = {};
+        const topLevel = [];
+        
+        // First pass: group children by parent_id
+        replies.forEach(reply => {
+            if (reply.parent_id) {
+                if (!childMap[reply.parent_id]) {
+                    childMap[reply.parent_id] = [];
+                }
+                childMap[reply.parent_id].push(reply);
+            }
+        });
+        
+        // Sort children by created_at
+        Object.keys(childMap).forEach(parentId => {
+            childMap[parentId].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        });
+        
+        // Second pass: get top-level replies (no parent_id)
+        replies.forEach(reply => {
+            if (!reply.parent_id) {
+                topLevel.push(reply);
+            }
+        });
+        
+        return { topLevelReplies: topLevel, childRepliesMap: childMap };
+    }, [replies]);
+
+    // Track previous reply count for auto-scroll
+    const prevReplyCount = useRef(0);
+    const initialScrollDone = useRef(false);
+    
+    // Auto-scroll to bottom when new messages are added or on initial load
     useEffect(() => {
         if (replies.length > 0) {
-            setTimeout(() => {
-                flatListRef.current?.scrollToEnd({
-                    animated: true,
-                });
-            }, 100);
+            const isInitialLoad = !initialScrollDone.current;
+            const hasNewMessages = replies.length > prevReplyCount.current;
+            
+            if (isInitialLoad || hasNewMessages) {
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({
+                        animated: !isInitialLoad, // No animation on initial load for instant scroll
+                    });
+                }, isInitialLoad ? 300 : 100); // Longer delay on initial load to ensure content is rendered
+                initialScrollDone.current = true;
+            }
         }
+        prevReplyCount.current = replies.length;
     }, [replies]);
 
     const fetchData = useCallback(
@@ -648,11 +690,30 @@ export default function IdeaDetailScreen({
             ));
         });
 
+        const unsubRead = onSocketEvent("reply:read", ({ replyIds, user: readUser, readAt }) => {
+            setReadReceipts((prev) => {
+                const updated = { ...prev };
+                for (const replyId of replyIds) {
+                    const existing = updated[replyId] || [];
+                    if (!existing.some(r => r.user_id === readUser.user_id)) {
+                        updated[replyId] = [...existing, {
+                            user_id: readUser.user_id,
+                            name: readUser.name,
+                            avatar_url: readUser.avatar_url,
+                            read_at: readAt
+                        }];
+                    }
+                }
+                return updated;
+            });
+        });
+
         return () => {
             leaveIdea(ideaId);
             unsubCreate();
             unsubDelete();
             unsubReaction();
+            unsubRead();
         };
     }, [ideaId]);
 
@@ -976,45 +1037,7 @@ export default function IdeaDetailScreen({
                     })
                 }{item.updated_at && new Date(item.updated_at).getTime() > new Date(item.created_at).getTime() + 1000 ? ' (edited)' : ''} <
                 /Text> < /
-                View > {
-                    isOwn && !item.content?.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i) && !item.content?.includes('/stickers/') && ( <
-                        TouchableOpacity onPress = {
-                            () => handleEditReply(item)
-                        }
-                        style = {
-                            styles.deleteButton
-                        } >
-                        <
-                        Ionicons name = "pencil-outline"
-                        size = {
-                            16
-                        }
-                        color = {
-                            colors.textTertiary
-                        }
-                        /> < /
-                        TouchableOpacity >
-                    )
-                } {
-                    isOwn && ( <
-                        TouchableOpacity onPress = {
-                            () => handleDeleteReply(item.id)
-                        }
-                        style = {
-                            styles.deleteButton
-                        } >
-                        <
-                        Ionicons name = "trash-outline"
-                        size = {
-                            16
-                        }
-                        color = {
-                            colors.textTertiary
-                        }
-                        /> < /
-                        TouchableOpacity >
-                    )
-                } <
+                View > <
                 /View> {
                 item.content ? (
                     // Check if content is a sticker/image URL
@@ -1268,6 +1291,22 @@ export default function IdeaDetailScreen({
                 >
                     <Ionicons name="happy-outline" size={16} color={colors.textTertiary} />
                 </TouchableOpacity>
+                {isOwn && !item.content?.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i) && !item.content?.includes('/stickers/') && (
+                    <TouchableOpacity 
+                        style={styles.replyActionBtn}
+                        onPress={() => handleEditReply(item)}
+                    >
+                        <Ionicons name="pencil-outline" size={16} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                )}
+                {isOwn && (
+                    <TouchableOpacity 
+                        style={styles.replyActionBtn}
+                        onPress={() => handleDeleteReply(item.id)}
+                    >
+                        <Ionicons name="trash-outline" size={16} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                )}
             </View>
             {/* Quick reaction picker */}
             {showReactionPicker === item.id && (
@@ -1301,7 +1340,106 @@ export default function IdeaDetailScreen({
                         Seen by {names}
                     </Text>
                 );
-            })()} < /
+            })()}
+            {/* Nested replies */}
+            {childRepliesMap[item.id]?.map((childReply, childIndex) => {
+                const isChildOwn = childReply.user_id === user?.id;
+                return (
+                    <View key={childReply.id} style={styles.nestedReplyContainer}>
+                        <View style={[styles.nestedReplyLine, { backgroundColor: colors.glassBorder }]} />
+                        <View style={[styles.nestedReplyContent, isChildOwn && styles.ownNestedReply]}>
+                            <GlassCard style={[styles.replyCard, styles.nestedReplyCard, isChildOwn && styles.ownReplyCard]}>
+                                <View style={styles.replyHeader}>
+                                    {childReply.author_avatar ? (
+                                        <Image source={{ uri: childReply.author_avatar }} style={styles.nestedAvatar} />
+                                    ) : (
+                                        <View style={[styles.nestedAvatar, { backgroundColor: colors.accent }]}>
+                                            <Text style={styles.nestedAvatarText}>{childReply.author_name?.charAt(0)?.toUpperCase()}</Text>
+                                        </View>
+                                    )}
+                                    <View style={styles.replyMeta}>
+                                        <Text style={[styles.authorName, { color: colors.text, fontSize: 12 }]}>{childReply.author_name}</Text>
+                                        <Text style={[styles.replyTime, { color: colors.textTertiary, fontSize: 10 }]}>
+                                            {new Date(childReply.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            {childReply.updated_at && new Date(childReply.updated_at).getTime() > new Date(childReply.created_at).getTime() + 1000 ? ' (edited)' : ''}
+                                        </Text>
+                                    </View>
+                                </View>
+                                {childReply.content ? (
+                                    childReply.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i) || childReply.content.includes('/stickers/') ? (
+                                        <TouchableOpacity onPress={() => setSelectedImage(childReply.content)} style={styles.stickerReply}>
+                                            {Platform.OS === "web" ? (
+                                                <img src={childReply.content} alt="sticker" style={{ maxWidth: 100, maxHeight: 100, objectFit: 'contain' }} />
+                                            ) : (
+                                                <Image source={{ uri: childReply.content }} style={styles.nestedStickerImage} resizeMode="contain" />
+                                            )}
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <Text style={[styles.replyContent, { color: colors.text, fontSize: 13 }]}>
+                                            {renderTextWithLinks(childReply.content)}
+                                        </Text>
+                                    )
+                                ) : null}
+                                {childReply.file_url && (
+                                    <TouchableOpacity onPress={() => childReply.file_type?.startsWith('video/') ? setSelectedVideo(childReply.file_url) : setSelectedImage(childReply.file_url)}>
+                                        {childReply.file_type?.startsWith('video/') ? (
+                                            <View style={[styles.nestedVideoThumb, { backgroundColor: colors.surface }]}>
+                                                <Ionicons name="play-circle" size={32} color={colors.accent} />
+                                            </View>
+                                        ) : (
+                                            Platform.OS === "web" ? (
+                                                <img src={childReply.file_url} alt="attachment" style={{ maxWidth: 150, maxHeight: 100, borderRadius: 8, marginTop: 8 }} />
+                                            ) : (
+                                                <Image source={{ uri: childReply.file_url }} style={styles.nestedAttachment} />
+                                            )
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                                {/* Reactions */}
+                                {childReply.reactions && Object.keys(childReply.reactions).length > 0 && (
+                                    <View style={styles.reactions}>
+                                        {Object.entries(childReply.reactions).map(([emoji, users]) => (
+                                            <TouchableOpacity key={emoji} style={[styles.reactionBadge, { backgroundColor: colors.surface }]} onPress={() => handleAddReaction(childReply.id, emoji)}>
+                                                <Text style={styles.reactionEmoji}>{emoji}</Text>
+                                                <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>{users.length}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
+                                {/* Action buttons for nested reply */}
+                                <View style={[styles.replyActions, { marginTop: 4 }]}>
+                                    <TouchableOpacity style={styles.replyActionBtn} onPress={() => handleReplyTo(childReply)}>
+                                        <Ionicons name="arrow-undo-outline" size={14} color={colors.textTertiary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.replyActionBtn} onPress={() => setShowReactionPicker(showReactionPicker === childReply.id ? null : childReply.id)}>
+                                        <Ionicons name="happy-outline" size={14} color={colors.textTertiary} />
+                                    </TouchableOpacity>
+                                    {isChildOwn && !childReply.content?.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i) && !childReply.content?.includes('/stickers/') && (
+                                        <TouchableOpacity style={styles.replyActionBtn} onPress={() => handleEditReply(childReply)}>
+                                            <Ionicons name="pencil-outline" size={14} color={colors.textTertiary} />
+                                        </TouchableOpacity>
+                                    )}
+                                    {isChildOwn && (
+                                        <TouchableOpacity style={styles.replyActionBtn} onPress={() => handleDeleteReply(childReply.id)}>
+                                            <Ionicons name="trash-outline" size={14} color={colors.textTertiary} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </GlassCard>
+                            {/* Read receipt for nested reply */}
+                            {isChildOwn && (() => {
+                                const reads = readReceipts[childReply.id] || [];
+                                const otherReads = reads.filter(r => r.user_id !== user?.id);
+                                if (otherReads.length === 0) {
+                                    return <Text style={[styles.readReceipt, styles.nestedReadReceipt, { color: colors.textTertiary }]}>Unseen</Text>;
+                                }
+                                const names = otherReads.map(r => r.name?.split(' ')[0]).join(', ');
+                                return <Text style={[styles.readReceipt, styles.nestedReadReceipt, { color: colors.textTertiary }]}>Seen by {names}</Text>;
+                            })()}
+                        </View>
+                    </View>
+                );
+            })} < /
         Animated.View >
     );
 };
@@ -1682,7 +1820,7 @@ return ( <
         flatListRef
     }
     data = {
-        replies
+        topLevelReplies
     }
     keyExtractor = {
         (item) => item.id
@@ -2232,6 +2370,60 @@ const styles = StyleSheet.create({
     },
     replyCard: {},
     ownReplyCard: {},
+    nestedReplyContainer: {
+        marginTop: 8,
+        marginLeft: 20,
+        flexDirection: "row",
+    },
+    nestedReplyLine: {
+        width: 2,
+        marginRight: 8,
+        borderRadius: 1,
+    },
+    nestedReplyContent: {
+        flex: 1,
+        alignSelf: "flex-start",
+    },
+    ownNestedReply: {
+        alignSelf: "flex-end",
+    },
+    nestedReplyCard: {
+        padding: 8,
+    },
+    nestedAvatar: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    nestedAvatarText: {
+        color: "#000",
+        fontSize: 10,
+        fontWeight: "600",
+    },
+    nestedStickerImage: {
+        width: 100,
+        height: 100,
+    },
+    nestedVideoThumb: {
+        width: 100,
+        height: 70,
+        borderRadius: 8,
+        marginTop: 8,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    nestedAttachment: {
+        maxWidth: 150,
+        maxHeight: 100,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    nestedReadReceipt: {
+        fontSize: 9,
+        marginTop: 2,
+    },
     replyHeader: {
         flexDirection: "row",
         alignItems: "center",

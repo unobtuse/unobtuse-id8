@@ -83,7 +83,7 @@ export default function BackgroundWrapper({
   // Web default background with UnicornStudio
   if (Platform.OS === "web" && !backgroundUrl) {
     return (
-      <View style={[styles.container, { backgroundColor: "transparent" }]}>
+      <View style={[styles.container, { backgroundColor: "#000000" }]}>
         <div
           data-us-project="bmaMERjX2VZDtPrh4Zwx"
           className={`absolute w-full h-full left-0 top-0 -z-10 ${theme === "light" ? "invert" : ""}`}

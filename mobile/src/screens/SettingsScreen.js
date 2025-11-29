@@ -641,10 +641,10 @@ export default function SettingsScreen({
         trackColor = {
             {
                 false: colors.surface,
-                true: theme === "dark" ? "#52525b" : colors.accent,
+                true: theme === "dark" ? "#52525b" : "#a1a1aa",
             }
         }
-        thumbColor = "#fff" /
+        thumbColor = {theme === "dark" ? colors.accent : "#fff"} /
         >
         <
         /View> <
@@ -1352,7 +1352,9 @@ export default function SettingsScreen({
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        backgroundColor: "rgba(0,0,0,0.7)",
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                        backdropFilter: "blur(8px)",
+                        WebkitBackdropFilter: "blur(8px)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1556,7 +1558,7 @@ const styles = StyleSheet.create({
         width: "100%",
         height: "70%",
         borderRadius: 8,
-        resizeMode: "cover",
+        resizeMode: "contain",
     },
     stickerNameLabel: {
         fontSize: 9,
@@ -1597,10 +1599,16 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 1000,
+        ...Platform.select({
+            web: {
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+            },
+        }),
     },
     confirmModal: {
         borderRadius: 16,
