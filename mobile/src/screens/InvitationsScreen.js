@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
   FlatList,
   TouchableOpacity,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
-import BackgroundWrapper from '../components/BackgroundWrapper';
-import GlassCard from '../components/GlassCard';
-import Button from '../components/Button';
-import { useTheme } from '../context/ThemeContext';
-import { useToast } from '../context/ToastContext';
-import { api } from '../services/api';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
+import BackgroundWrapper from "../components/BackgroundWrapper";
+import GlassCard from "../components/GlassCard";
+import Button from "../components/Button";
+import { useTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import { api } from "../services/api";
 
 export default function InvitationsScreen({ navigation }) {
   const { colors } = useTheme();
@@ -28,10 +28,10 @@ export default function InvitationsScreen({ navigation }) {
 
   const fetchInvitations = async () => {
     try {
-      const data = await api.get('/collaborators/invitations');
+      const data = await api.get("/collaborators/invitations");
       setInvitations(data);
     } catch (error) {
-      console.error('Fetch invitations error:', error);
+      console.error("Fetch invitations error:", error);
     } finally {
       setLoading(false);
     }
@@ -40,10 +40,13 @@ export default function InvitationsScreen({ navigation }) {
   const handleRespond = async (id, accept) => {
     try {
       await api.patch(`/collaborators/${id}/respond`, { accept });
-      setInvitations(prev => prev.filter(inv => inv.id !== id));
-      showToast(accept ? 'Invitation accepted!' : 'Invitation declined', 'success');
+      setInvitations((prev) => prev.filter((inv) => inv.id !== id));
+      showToast(
+        accept ? "Invitation accepted!" : "Invitation declined",
+        "success",
+      );
     } catch (error) {
-      showToast('Failed to respond to invitation', 'error');
+      showToast("Failed to respond to invitation", "error");
     }
   };
 
@@ -51,11 +54,19 @@ export default function InvitationsScreen({ navigation }) {
     <Animated.View entering={FadeInUp.delay(index * 100).duration(400)}>
       <GlassCard style={styles.invitationCard}>
         <View style={styles.invitationHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: `${colors.accent}20` }]}>
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: `${colors.accent}20` },
+            ]}
+          >
             <Ionicons name="bulb" size={24} color={colors.accent} />
           </View>
           <View style={styles.invitationInfo}>
-            <Text style={[styles.ideaTitle, { color: colors.text }]} numberOfLines={1}>
+            <Text
+              style={[styles.ideaTitle, { color: colors.text }]}
+              numberOfLines={1}
+            >
               {item.idea_title}
             </Text>
             <Text style={[styles.inviterName, { color: colors.textSecondary }]}>
@@ -63,7 +74,7 @@ export default function InvitationsScreen({ navigation }) {
             </Text>
           </View>
         </View>
-        
+
         <View style={styles.actions}>
           <Button
             title="Decline"
@@ -83,7 +94,11 @@ export default function InvitationsScreen({ navigation }) {
 
   const renderEmpty = () => (
     <Animated.View entering={FadeIn.duration(400)} style={styles.empty}>
-      <Ionicons name="mail-open-outline" size={64} color={colors.textTertiary} />
+      <Ionicons
+        name="mail-open-outline"
+        size={64}
+        color={colors.textTertiary}
+      />
       <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
         No pending invitations
       </Text>
@@ -97,10 +112,15 @@ export default function InvitationsScreen({ navigation }) {
     <BackgroundWrapper>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.closeButton}
+          >
             <Ionicons name="close" size={28} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>Invitations</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Invitations
+          </Text>
           <View style={{ width: 44 }} />
         </View>
 
@@ -121,9 +141,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -132,7 +152,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   list: {
     padding: 16,
@@ -142,16 +162,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   invitationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
   },
   iconContainer: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   invitationInfo: {
     flex: 1,
@@ -159,29 +179,29 @@ const styles = StyleSheet.create({
   },
   ideaTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   inviterName: {
     fontSize: 13,
     marginTop: 2,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   empty: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 40,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 8,
     lineHeight: 20,
   },

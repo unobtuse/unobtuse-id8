@@ -18,6 +18,7 @@ import {
     Modal,
     Pressable,
     Dimensions,
+    Linking,
 } from "react-native";
 import {
     SafeAreaView
@@ -31,8 +32,7 @@ import Animated, {
     FadeIn,
     FadeInUp
 } from "react-native-reanimated";
-import StickerPicker from "../components/StickerPicker";
-import EmojiPicker from "../components/EmojiPicker";
+import MediaPicker from "../components/MediaPicker";
 import AutocompleteMenu from "../components/AutocompleteMenu";
 import BackgroundWrapper from "../components/BackgroundWrapper";
 import GlassCard from "../components/GlassCard";
@@ -141,6 +141,9 @@ const InviteForm = memo(({
     );
 });
 
+// BlurView for input container
+const BlurView = Platform.OS !== "web" ? require("expo-blur").BlurView : View;
+
 // Memoized reply composer to prevent re-renders
 const ReplyComposer = memo(
     ({
@@ -148,12 +151,14 @@ const ReplyComposer = memo(
         colors,
         onReplySubmitted,
         showToast,
-        onStickerPress,
-        onEmojiPress,
+        onMediaPickerPress,
         emojiToInsert,
         onEmojiInserted,
         replyingTo,
-        onCancelReply
+        onCancelReply,
+        editingReply,
+        onCancelEdit,
+        onSaveEdit
     }) => {
         const [content, setContent] = useState("");
         const [selectedFile, setSelectedFile] = useState(null);
@@ -169,6 +174,15 @@ const ReplyComposer = memo(
                 onEmojiInserted?.();
             }
         }, [emojiToInsert, onEmojiInserted]);
+
+        // Populate content when editing
+        useEffect(() => {
+            if (editingReply) {
+                setContent(editingReply.content || "");
+            } else {
+                setContent("");
+            }
+        }, [editingReply]);
 
         // Detect :query pattern for autocomplete
         const handleContentChange = (text) => {
@@ -219,6 +233,14 @@ const ReplyComposer = memo(
 
             setSending(true);
             try {
+                // Handle edit mode
+                if (editingReply) {
+                    await onSaveEdit(content.trim());
+                    setContent("");
+                    setSending(false);
+                    return;
+                }
+
                 const reply = await api.post("/replies", {
                     ideaId,
                     content: content.trim() || "",
@@ -282,15 +304,8 @@ const ReplyComposer = memo(
             }
         };
 
-        return ( <
-            View style = {
-                [
-                    styles.inputContainer,
-                    {
-                        borderTopColor: colors.glassBorder,
-                    },
-                ]
-            } >
+        const inputContainerContent = (
+            <>
             {/* Reply context banner */}
             {replyingTo && (
                 <View style={[styles.replyingToBanner, { backgroundColor: colors.surface }]}>
@@ -303,6 +318,22 @@ const ReplyComposer = memo(
                         </Text>
                     </View>
                     <TouchableOpacity onPress={onCancelReply} style={styles.replyingToClose}>
+                        <Ionicons name="close" size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                </View>
+            )}
+            {/* Edit mode banner */}
+            {editingReply && (
+                <View style={[styles.replyingToBanner, { backgroundColor: colors.surface }]}>
+                    <View style={styles.replyingToContent}>
+                        <Text style={[styles.replyingToLabel, { color: colors.accent }]}>
+                            Editing message
+                        </Text>
+                        <Text style={[styles.replyingToText, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {editingReply.content?.includes('/stickers/') ? '📷 Sticker' : editingReply.content}
+                        </Text>
+                    </View>
+                    <TouchableOpacity onPress={onCancelEdit} style={styles.replyingToClose}>
                         <Ionicons name="close" size={18} color={colors.textSecondary} />
                     </TouchableOpacity>
                 </View>
@@ -402,23 +433,7 @@ const ReplyComposer = memo(
             /> < /
             TouchableOpacity > <
             TouchableOpacity onPress = {
-                onStickerPress
-            }
-            style = {
-                styles.attachButton
-            } >
-            <
-            Ionicons name = "images-outline"
-            size = {
-                24
-            }
-            color = {
-                colors.textSecondary
-            }
-            /> < /
-            TouchableOpacity > <
-            TouchableOpacity onPress = {
-                onEmojiPress
+                onMediaPickerPress
             }
             style = {
                 styles.attachButton
@@ -439,10 +454,12 @@ const ReplyComposer = memo(
                     {
                         color: colors.text,
                         backgroundColor: colors.surface,
+                        minHeight: 40,
+                        maxHeight: 120,
                     },
                 ]
             }
-            placeholder = "Add to the thread..."
+            placeholder = {editingReply ? "Edit your message..." : "Add to the thread..."}
             placeholderTextColor = {
                 colors.textTertiary
             }
@@ -452,12 +469,15 @@ const ReplyComposer = memo(
             onChangeText = {
                 handleContentChange
             }
-            multiline onKeyPress = {
+            multiline
+            numberOfLines = {1}
+            onKeyPress = {
                 handleKeyPress
             }
             blurOnSubmit = {
                 false
             }
+            textAlignVertical = "center"
             /> <
             TouchableOpacity onPress = {
                 handleSendReply
@@ -475,15 +495,37 @@ const ReplyComposer = memo(
                 ]
             } >
             <
-            Ionicons name = "send"
+            Ionicons name = {editingReply ? "checkmark" : "send"}
             size = {
                 18
             }
             color = "#000" / >
             <
             /TouchableOpacity> < /
-            View > <
-            /View>
+            View >
+            </>
+        );
+
+        if (Platform.OS === "web") {
+            return (
+                <div className="backdrop-blur-xl" style={{
+                    borderTop: `1px solid ${colors.glassBorder}`,
+                    backgroundColor: colors.glass,
+                    padding: 8,
+                    paddingBottom: 8,
+                }}>
+                    {inputContainerContent}
+                </div>
+            );
+        }
+
+        return (
+            <View style={[styles.inputContainer, { borderTopColor: colors.glassBorder }]}>
+                <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={[styles.inputContainerOverlay, { backgroundColor: colors.glass }]}>
+                    {inputContainerContent}
+                </View>
+            </View>
         );
     },
 );
@@ -508,8 +550,7 @@ export default function IdeaDetailScreen({
     const [replies, setReplies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showInvite, setShowInvite] = useState(false);
-    const [showStickers, setShowStickers] = useState(false);
-    const [showEmojis, setShowEmojis] = useState(false);
+    const [showMediaPicker, setShowMediaPicker] = useState(false);
     const [emojiToInsert, setEmojiToInsert] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [confirmModal, setConfirmModal] = useState({
@@ -518,7 +559,9 @@ export default function IdeaDetailScreen({
     });
     const [readReceipts, setReadReceipts] = useState({});
     const [replyingTo, setReplyingTo] = useState(null);
+    const [editingReply, setEditingReply] = useState(null);
     const [showReactionPicker, setShowReactionPicker] = useState(null);
+    const [collaborators, setCollaborators] = useState([]);
     const iconInputRef = useRef(null);
     const flatListRef = useRef(null);
 
@@ -536,10 +579,11 @@ export default function IdeaDetailScreen({
     const fetchData = useCallback(
         async (isPolling = false) => {
                 try {
-                    const [ideaData, repliesData, readsData] = await Promise.all([
+                    const [ideaData, repliesData, readsData, collabsData] = await Promise.all([
                         api.get(`/ideas/${ideaId}`),
                         api.get(`/replies/idea/${ideaId}`),
                         api.get(`/replies/reads/${ideaId}`),
+                        api.get(`/collaborators/idea/${ideaId}`),
                     ]);
 
                     setIdea((prev) => {
@@ -553,6 +597,7 @@ export default function IdeaDetailScreen({
                         return prevStr === newStr ? prev : repliesData;
                     });
                     setReadReceipts(readsData || {});
+                    setCollaborators(collabsData || []);
                     
                     // Mark all replies as read for current user
                     if (repliesData?.length > 0) {
@@ -642,6 +687,27 @@ export default function IdeaDetailScreen({
         setReplyingTo(null);
     };
 
+    const handleEditReply = (reply) => {
+        setEditingReply(reply);
+        setReplyingTo(null);
+        setShowReactionPicker(null);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingReply(null);
+    };
+
+    const handleSaveEdit = async (content) => {
+        if (!editingReply) return;
+        try {
+            await api.put(`/replies/${editingReply.id}`, { content });
+            setEditingReply(null);
+            fetchData();
+        } catch (error) {
+            showToast("Failed to update message", "error");
+        }
+    };
+
     const handleAddReaction = async (replyId, emoji) => {
         setShowReactionPicker(null);
         try {
@@ -693,7 +759,7 @@ export default function IdeaDetailScreen({
     };
 
     const handleEmojiSelect = (emoji) => {
-        setShowEmojis(false);
+        setShowMediaPicker(false);
         setEmojiToInsert(emoji);
     };
 
@@ -702,7 +768,7 @@ export default function IdeaDetailScreen({
     };
 
     const handleStickerSelect = async (sticker) => {
-        setShowStickers(false);
+        setShowMediaPicker(false);
         try {
             // Send sticker as a reply with attachment
             // First create reply
@@ -776,6 +842,40 @@ export default function IdeaDetailScreen({
         } catch (error) {
             showToast("Failed to send sticker", "error");
         }
+    };
+
+    const renderTextWithLinks = (text, textStyle) => {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const parts = text.split(urlRegex);
+        
+        if (parts.length === 1) {
+            return <Text style={textStyle}>{text}</Text>;
+        }
+        
+        return (
+            <Text style={textStyle}>
+                {parts.map((part, index) => {
+                    if (part.match(urlRegex)) {
+                        return (
+                            <Text
+                                key={index}
+                                style={[textStyle, { color: colors.accent, textDecorationLine: 'underline' }]}
+                                onPress={() => {
+                                    if (Platform.OS === 'web') {
+                                        window.open(part, '_blank');
+                                    } else {
+                                        Linking.openURL(part);
+                                    }
+                                }}
+                            >
+                                {part}
+                            </Text>
+                        );
+                    }
+                    return part;
+                })}
+            </Text>
+        );
     };
 
     const renderReply = ({
@@ -874,9 +974,28 @@ export default function IdeaDetailScreen({
                         hour: "2-digit",
                         minute: "2-digit",
                     })
-                } <
+                }{item.updated_at && new Date(item.updated_at).getTime() > new Date(item.created_at).getTime() + 1000 ? ' (edited)' : ''} <
                 /Text> < /
                 View > {
+                    isOwn && !item.content?.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i) && !item.content?.includes('/stickers/') && ( <
+                        TouchableOpacity onPress = {
+                            () => handleEditReply(item)
+                        }
+                        style = {
+                            styles.deleteButton
+                        } >
+                        <
+                        Ionicons name = "pencil-outline"
+                        size = {
+                            16
+                        }
+                        color = {
+                            colors.textTertiary
+                        }
+                        /> < /
+                        TouchableOpacity >
+                    )
+                } {
                     isOwn && ( <
                         TouchableOpacity onPress = {
                             () => handleDeleteReply(item.id)
@@ -925,12 +1044,10 @@ export default function IdeaDetailScreen({
                             )}
                         </TouchableOpacity>
                     ) : (
-                        <Text style={[
+                        renderTextWithLinks(item.content, [
                             styles.replyContent,
                             { color: colors.text },
-                        ]}>
-                            {item.content}
-                        </Text>
+                        ])
                     )
                 ) : null
             } {
@@ -1330,37 +1447,39 @@ const renderHeader = () => ( <
     }• {
         new Date(idea?.created_at).toLocaleDateString()
     } <
-    /Text> {
-idea?.user_id === user?.id && ( <
-    TouchableOpacity style = {
-        styles.inviteButton
-    }
-    onPress = {
-        () => setShowInvite(!showInvite)
-    } >
-    <
-    Ionicons name = "person-add-outline"
-    size = {
-        18
-    }
-    color = {
-        colors.accent
-    }
-    /> <
-    Text style = {
-        [
-            styles.inviteText,
-            {
-                color: colors.accent,
-            },
-        ]
-    } >
-
-    Invite <
-    /Text> < /
-    TouchableOpacity >
-)
-} <
+    /Text>
+    {/* Participant avatars */}
+    <View style={styles.participantsRow}>
+        {/* Owner avatar */}
+        {idea?.owner_avatar ? (
+            <Image source={{ uri: idea.owner_avatar }} style={styles.participantAvatar} />
+        ) : (
+            <View style={[styles.participantAvatar, { backgroundColor: colors.accent }]}>
+                <Text style={styles.participantAvatarText}>{idea?.owner_name?.charAt(0)?.toUpperCase()}</Text>
+            </View>
+        )}
+        {/* Collaborator avatars */}
+        {collaborators.filter(c => c.status === 'accepted' && c.user_id !== idea?.user_id).slice(0, 5).map((collab, idx) => (
+            collab.avatar_url ? (
+                <Image key={collab.id} source={{ uri: collab.avatar_url }} style={[styles.participantAvatar, { marginLeft: -8 }]} />
+            ) : (
+                <View key={collab.id} style={[styles.participantAvatar, { backgroundColor: colors.accent, marginLeft: -8 }]}>
+                    <Text style={styles.participantAvatarText}>{collab.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                </View>
+            )
+        ))}
+        {collaborators.filter(c => c.status === 'accepted' && c.user_id !== idea?.user_id).length > 5 && (
+            <View style={[styles.participantAvatar, { backgroundColor: colors.surface, marginLeft: -8 }]}>
+                <Text style={[styles.participantAvatarText, { color: colors.text }]}>+{collaborators.filter(c => c.status === 'accepted').length - 5}</Text>
+            </View>
+        )}
+        {idea?.user_id === user?.id && ( 
+            <TouchableOpacity style={[styles.participantAvatar, styles.inviteAvatarBtn, { marginLeft: -8, borderColor: colors.accent }]} onPress={() => setShowInvite(!showInvite)}>
+                <Ionicons name="person-add-outline" size={14} color={colors.accent} />
+            </TouchableOpacity>
+        )}
+    </View>
+ <
 /View> < /
 GlassCard > <
     /Animated.View> {
@@ -1397,7 +1516,10 @@ View >
 
 if (loading) {
     return ( <
-        BackgroundWrapper >
+        BackgroundWrapper
+        overrideBackgroundUrl = {idea?.background_url}
+        overrideBackgroundType = {idea?.background_type}
+        >
         <
         SafeAreaView style = {
             styles.container
@@ -1422,7 +1544,10 @@ if (loading) {
 }
 
 return ( <
-    BackgroundWrapper >
+    BackgroundWrapper
+    overrideBackgroundUrl = {idea?.background_url}
+    overrideBackgroundType = {idea?.background_type}
+    >
     <
     SafeAreaView style = {
         styles.container
@@ -1579,23 +1704,16 @@ return ( <
         Platform.OS === "ios" ? 88 : 0
     } >
     <
-    StickerPicker visible = {
-        showStickers
+    MediaPicker visible = {
+        showMediaPicker
     }
     onClose = {
-        () => setShowStickers(false)
+        () => setShowMediaPicker(false)
     }
-    onSelect = {
+    onSelectSticker = {
         handleStickerSelect
     }
-    /> <
-    EmojiPicker visible = {
-        showEmojis
-    }
-    onClose = {
-        () => setShowEmojis(false)
-    }
-    onSelect = {
+    onSelectEmoji = {
         handleEmojiSelect
     }
     /> <
@@ -1611,11 +1729,8 @@ return ( <
     showToast = {
         showToast
     }
-    onStickerPress = {
-        () => { setShowEmojis(false); setShowStickers(true); }
-    }
-    onEmojiPress = {
-        () => { setShowStickers(false); setShowEmojis(true); }
+    onMediaPickerPress = {
+        () => setShowMediaPicker(true)
     }
     emojiToInsert = {
         emojiToInsert
@@ -1628,6 +1743,15 @@ return ( <
     }
     onCancelReply = {
         handleCancelReply
+    }
+    editingReply = {
+        editingReply
+    }
+    onCancelEdit = {
+        handleCancelEdit
+    }
+    onSaveEdit = {
+        handleSaveEdit
     }
     /> < /
     KeyboardAvoidingView > {
@@ -2045,6 +2169,29 @@ const styles = StyleSheet.create({
     metaText: {
         fontSize: 12,
     },
+    participantsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 12,
+    },
+    participantAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 2,
+        borderColor: "rgba(0,0,0,0.2)",
+    },
+    participantAvatarText: {
+        fontSize: 12,
+        fontWeight: "600",
+        color: "#000",
+    },
+    inviteAvatarBtn: {
+        backgroundColor: "transparent",
+        borderStyle: "dashed",
+    },
     inviteButton: {
         flexDirection: "row",
         alignItems: "center",
@@ -2153,9 +2300,12 @@ const styles = StyleSheet.create({
     },
     inputContainer: {
         position: "relative",
+        borderTopWidth: 1,
+        overflow: "hidden",
+    },
+    inputContainerOverlay: {
         padding: 8,
         paddingBottom: Platform.OS === "ios" ? 8 : 8,
-        borderTopWidth: 1,
     },
     filePreview: {
         flexDirection: "row",

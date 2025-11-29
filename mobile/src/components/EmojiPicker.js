@@ -1,254 +1,500 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+    useState,
+    useEffect,
+    useMemo,
+    useRef
+} from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Dimensions,
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    TextInput,
+    SectionList,
+    Dimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../context/ThemeContext";
+import {
+    Ionicons
+} from "@expo/vector-icons";
+import {
+    useTheme
+} from "../context/ThemeContext";
 import emojiData from "../data/emojis.json";
 
 const RECENT_EMOJIS_KEY = "@recent_emojis";
 const MAX_RECENT = 24;
+const EMOJI_SIZE = 36;
+const NUM_COLUMNS = 7;
 
 // Category configuration with icons
-const CATEGORIES = [
-  { key: "recent", icon: "🕐", name: "Recent" },
-  { key: "Smileys & Emotion", icon: "😀", name: "Smileys" },
-  { key: "People & Body", icon: "👋", name: "People" },
-  { key: "Animals & Nature", icon: "🐶", name: "Animals" },
-  { key: "Food & Drink", icon: "🍕", name: "Food" },
-  { key: "Activities", icon: "⚽", name: "Activities" },
-  { key: "Travel & Places", icon: "✈️", name: "Travel" },
-  { key: "Objects", icon: "💡", name: "Objects" },
-  { key: "Symbols", icon: "❤️", name: "Symbols" },
-  { key: "Flags", icon: "🏳️", name: "Flags" },
+const CATEGORIES = [{
+        key: "recent",
+        icon: "🕐",
+        name: "Frequently Used"
+    },
+    {
+        key: "Smileys & Emotion",
+        icon: "😀",
+        name: "Smileys & Emotion"
+    },
+    {
+        key: "People & Body",
+        icon: "👋",
+        name: "People & Body"
+    },
+    {
+        key: "Animals & Nature",
+        icon: "🐶",
+        name: "Animals & Nature"
+    },
+    {
+        key: "Food & Drink",
+        icon: "🍕",
+        name: "Food & Drink"
+    },
+    {
+        key: "Activities",
+        icon: "⚽",
+        name: "Activities"
+    },
+    {
+        key: "Travel & Places",
+        icon: "✈️",
+        name: "Travel & Places"
+    },
+    {
+        key: "Objects",
+        icon: "💡",
+        name: "Objects"
+    },
+    {
+        key: "Symbols",
+        icon: "❤️",
+        name: "Symbols"
+    },
+    {
+        key: "Flags",
+        icon: "🏳️",
+        name: "Flags"
+    },
 ];
 
-// Flatten emoji data for easy access
-const getAllEmojis = () => {
-  const emojis = [];
-  const categories = emojiData.emojis || {};
-  
-  Object.entries(categories).forEach(([category, subcategories]) => {
-    if (category === "Component") return; // Skip component emojis (skin tones, etc.)
-    Object.entries(subcategories).forEach(([subcategory, emojiList]) => {
-      emojiList.forEach(e => {
-        emojis.push({
-          emoji: e.emoji,
-          name: e.name,
-          category,
-          subcategory,
+// Helper to process emoji data into sections
+const getSections = (recentEmojis) => {
+    const sections = [];
+
+    // 1. Recent Section
+    if (recentEmojis.length > 0) {
+        sections.push({
+            title: "Frequently Used",
+            key: "recent",
+            data: [recentEmojis], // Array of rows (we'll just have one item which is the array of emojis for grid rendering)
+            isGrid: true,
         });
-      });
+    }
+
+    // 2. Other Categories
+    const categories = emojiData.emojis || {};
+    Object.entries(categories).forEach(([categoryKey, subcategories]) => {
+        if (categoryKey === "Component") return;
+
+        // Check if this category is in our supported list to maintain order/icons
+        const config = CATEGORIES.find((c) => c.key === categoryKey);
+        if (!config) return;
+
+        const categoryEmojis = [];
+        Object.values(subcategories).forEach((emojiList) => {
+            emojiList.forEach((e) => categoryEmojis.push(e.emoji));
+        });
+
+        if (categoryEmojis.length > 0) {
+            sections.push({
+                title: config.name,
+                key: categoryKey,
+                data: [categoryEmojis], // Pass as a single item to render a custom grid cell
+                isGrid: true,
+            });
+        }
     });
-  });
-  
-  return emojis;
+
+    // Sort sections based on CATEGORIES order
+    return sections.sort((a, b) => {
+        const indexA = CATEGORIES.findIndex((c) => c.key === a.key);
+        const indexB = CATEGORIES.findIndex((c) => c.key === b.key);
+        return indexA - indexB;
+    });
 };
 
-const ALL_EMOJIS = getAllEmojis();
+export default function EmojiPicker({
+    visible,
+    onSelect,
+    onClose
+}) {
+    const {
+        colors
+    } = useTheme();
+    const [searchQuery, setSearchQuery] = useState("");
+    const [recentEmojis, setRecentEmojis] = useState([]);
+    const [activeCategory, setActiveCategory] = useState("recent");
+    const sectionListRef = useRef(null);
 
-// Get emojis for a specific category
-const getCategoryEmojis = (categoryKey) => {
-  if (categoryKey === "recent") return [];
-  const categoryData = emojiData.emojis?.[categoryKey];
-  if (!categoryData) return [];
-  
-  const emojis = [];
-  Object.values(categoryData).forEach(subcategoryEmojis => {
-    subcategoryEmojis.forEach(e => emojis.push(e.emoji));
-  });
-  return emojis;
-};
+    useEffect(() => {
+        loadRecentEmojis();
+    }, []);
 
-export default function EmojiPicker({ visible, onSelect, onClose }) {
-  const { colors } = useTheme();
-  const [category, setCategory] = useState("recent");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [recentEmojis, setRecentEmojis] = useState([]);
-  const screenWidth = Dimensions.get("window").width;
-  const emojiSize = Math.floor((screenWidth - 32) / 8);
+    const loadRecentEmojis = async () => {
+        try {
+            const stored = await AsyncStorage.getItem(RECENT_EMOJIS_KEY);
+            if (stored) {
+                setRecentEmojis(JSON.parse(stored));
+            }
+        } catch (error) {
+            console.error("Failed to load recent emojis:", error);
+        }
+    };
 
-  useEffect(() => {
-    loadRecentEmojis();
-  }, []);
+    const saveRecentEmoji = async (emoji) => {
+        try {
+            const updated = [emoji, ...recentEmojis.filter((e) => e !== emoji)].slice(
+                0,
+                MAX_RECENT
+            );
+            setRecentEmojis(updated);
+            await AsyncStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(updated));
+        } catch (error) {
+            console.error("Failed to save recent emoji:", error);
+        }
+    };
 
-  const loadRecentEmojis = async () => {
-    try {
-      const stored = await AsyncStorage.getItem(RECENT_EMOJIS_KEY);
-      if (stored) {
-        setRecentEmojis(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error("Failed to load recent emojis:", error);
-    }
-  };
+    const handleSelect = (emoji) => {
+        saveRecentEmoji(emoji);
+        onSelect(emoji);
+    };
 
-  const saveRecentEmoji = async (emoji) => {
-    try {
-      const updated = [emoji, ...recentEmojis.filter(e => e !== emoji)].slice(0, MAX_RECENT);
-      setRecentEmojis(updated);
-      await AsyncStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(updated));
-    } catch (error) {
-      console.error("Failed to save recent emoji:", error);
-    }
-  };
+    const sections = useMemo(() => {
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const allEmojis = [];
 
-  const handleSelect = (emoji) => {
-    saveRecentEmoji(emoji);
-    onSelect(emoji);
-  };
+            // Flatten all emojis for search
+            Object.entries(emojiData.emojis || {}).forEach(([cat, subcats]) => {
+                if (cat === "Component") return;
+                Object.values(subcats).forEach(list => {
+                    list.forEach(e => {
+                        if (e.name.toLowerCase().includes(query)) {
+                            allEmojis.push(e.emoji);
+                        }
+                    });
+                });
+            });
 
-  // Get display emojis based on category and search
-  const displayEmojis = useMemo(() => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      return ALL_EMOJIS
-        .filter(e => e.name.toLowerCase().includes(query))
-        .slice(0, 100)
-        .map(e => e.emoji);
-    }
-    
-    if (category === "recent") {
-      return recentEmojis;
-    }
-    
-    return getCategoryEmojis(category);
-  }, [category, searchQuery, recentEmojis]);
+            return [{
+                title: "Search Results",
+                key: "search",
+                data: [allEmojis],
+                isGrid: true
+            }];
+        }
+        return getSections(recentEmojis);
+    }, [recentEmojis, searchQuery]);
 
-  if (!visible) return null;
+    const handleCategoryPress = (categoryKey) => {
+        setActiveCategory(categoryKey);
+        const sectionIndex = sections.findIndex((s) => s.key === categoryKey);
+        if (sectionIndex !== -1 && sectionListRef.current) {
+            sectionListRef.current.scrollToLocation({
+                sectionIndex,
+                itemIndex: 0,
+                animated: true,
+            });
+        }
+    };
 
-  return (
-    <View style={[styles.drawer, { backgroundColor: colors.surface, borderTopColor: colors.glassBorder }]}>
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={16} color={colors.textTertiary} style={styles.searchIcon} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text, backgroundColor: colors.glass }]}
-          placeholder="Search emojis..."
-          placeholderTextColor={colors.textTertiary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
+    const onViewableItemsChanged = useRef(({
+        viewableItems
+    }) => {
+        if (viewableItems.length > 0) {
+            const firstVisible = viewableItems[0];
+            if (firstVisible.section) {
+                setActiveCategory(firstVisible.section.key);
+            }
+        }
+    }).current;
 
-      {/* Category tabs */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        style={styles.categoryTabs}
-        contentContainerStyle={styles.categoryTabsContent}
-      >
-        {CATEGORIES.map(cat => (
-          <TouchableOpacity
-            key={cat.key}
-            style={[
-              styles.categoryTab,
-              category === cat.key && { backgroundColor: colors.accent + "30" }
-            ]}
-            onPress={() => { setCategory(cat.key); setSearchQuery(""); }}
-          >
-            <Text style={styles.categoryIcon}>{cat.icon}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    const renderSectionHeader = ({
+        section: {
+            title
+        }
+    }) => ( <
+        View style = {
+            [styles.sectionHeader, {
+                backgroundColor: colors.surface
+            }]
+        } >
+        <
+        Text style = {
+            [styles.sectionHeaderText, {
+                color: colors.textSecondary
+            }]
+        } > {
+            title
+        } <
+        /Text> <
+        /View>
+    );
 
-      {/* Emoji grid */}
-      <ScrollView style={styles.emojiGrid} contentContainerStyle={styles.emojiGridContent}>
-        {displayEmojis.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
-            {category === "recent" ? "No recent emojis" : "No emojis found"}
-          </Text>
-        ) : (
-          <View style={styles.emojiRow}>
-            {displayEmojis.map((emoji, index) => (
-              <TouchableOpacity
-                key={`${emoji}-${index}`}
-                style={[styles.emojiBtn, { width: emojiSize, height: emojiSize }]}
-                onPress={() => handleSelect(emoji)}
-              >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
+    const renderItem = ({
+        item
+    }) => ( <
+        View style = {
+            styles.emojiGrid
+        } > {
+            item.map((emoji, index) => ( <
+                TouchableOpacity key = {
+                    `${emoji}-${index}`
+                }
+                style = {
+                    styles.emojiBtn
+                }
+                onPress = {
+                    () => handleSelect(emoji)
+                } >
+                <
+                Text style = {
+                    styles.emoji
+                } > {
+                    emoji
+                } < /Text> <
+                /TouchableOpacity>
+            ))
+        } <
+        /View>
+    );
+
+    if (!visible) return null;
+
+    return ( <
+        View style = {
+            [
+                styles.container,
+                {
+                    backgroundColor: colors.surface,
+                    borderTopColor: colors.glassBorder
+                },
+            ]
+        } >
+        {
+            /* Search Bar */ } <
+        View style = {
+            [styles.searchContainer, {
+                borderBottomColor: colors.glassBorder
+            }]
+        } >
+        <
+        Ionicons name = "search"
+        size = {
+            16
+        }
+        color = {
+            colors.textTertiary
+        }
+        style = {
+            styles.searchIcon
+        }
+        /> <
+        TextInput style = {
+            [
+                styles.searchInput,
+                {
+                    color: colors.text,
+                    backgroundColor: colors.glass
+                },
+            ]
+        }
+        placeholder = "Search emojis..."
+        placeholderTextColor = {
+            colors.textTertiary
+        }
+        value = {
+            searchQuery
+        }
+        onChangeText = {
+            setSearchQuery
+        }
+        /> <
+        TouchableOpacity onPress = {
+            onClose
+        }
+        style = {
+            styles.closeBtn
+        } >
+        <
+        Ionicons name = "close"
+        size = {
+            20
+        }
+        color = {
+            colors.textSecondary
+        }
+        /> <
+        /TouchableOpacity> <
+        /View>
+
+        <
+        View style = {
+            styles.contentContainer
+        } > {
+            /* Sidebar */ } <
+        View style = {
+            [styles.sidebar, {
+                borderRightColor: colors.glassBorder,
+                backgroundColor: colors.background
+            }]
+        } > {
+            CATEGORIES.map((cat) => ( <
+                TouchableOpacity key = {
+                    cat.key
+                }
+                style = {
+                    [
+                        styles.sidebarBtn,
+                        activeCategory === cat.key && {
+                            backgroundColor: colors.accent + "20",
+                            borderLeftColor: colors.accent,
+                        },
+                    ]
+                }
+                onPress = {
+                    () => handleCategoryPress(cat.key)
+                } >
+                <
+                Text style = {
+                    styles.sidebarIcon
+                } > {
+                    cat.icon
+                } < /Text> <
+                /TouchableOpacity>
+            ))
+        } <
+        /View>
+
+        {
+            /* Main List */ } <
+        SectionList ref = {
+            sectionListRef
+        }
+        sections = {
+            sections
+        }
+        keyExtractor = {
+            (item, index) => index.toString()
+        }
+        renderItem = {
+            renderItem
+        }
+        renderSectionHeader = {
+            renderSectionHeader
+        }
+        stickySectionHeadersEnabled = {
+            false
+        }
+        onViewableItemsChanged = {
+            onViewableItemsChanged
+        }
+        viewabilityConfig = {
+            {
+                itemVisiblePercentThreshold: 10,
+                minimumViewTime: 0,
+            }
+        }
+        contentContainerStyle = {
+            styles.listContent
+        }
+        showsVerticalScrollIndicator = {
+            true
+        }
+        /> <
+        /View> <
+        /View>
+    );
 }
 
 const styles = StyleSheet.create({
-  drawer: {
-    height: 280,
-    borderTopWidth: 1,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 8,
-    gap: 8,
-  },
-  searchIcon: {
-    position: "absolute",
-    left: 20,
-    zIndex: 1,
-  },
-  searchInput: {
-    flex: 1,
-    height: 36,
-    borderRadius: 18,
-    paddingHorizontal: 36,
-    fontSize: 14,
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  categoryTabs: {
-    maxHeight: 44,
-  },
-  categoryTabsContent: {
-    paddingHorizontal: 8,
-    gap: 4,
-  },
-  categoryTab: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  categoryIcon: {
-    fontSize: 20,
-  },
-  emojiGrid: {
-    flex: 1,
-  },
-  emojiGridContent: {
-    padding: 8,
-  },
-  emojiRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  emojiBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emoji: {
-    fontSize: 24,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: 40,
-    fontSize: 14,
-  },
+    container: {
+        height: 350,
+        borderTopWidth: 1,
+        overflow: "hidden",
+    },
+    searchContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 12,
+        gap: 8,
+        borderBottomWidth: 1,
+    },
+    searchIcon: {
+        position: "absolute",
+        left: 24,
+        zIndex: 1,
+    },
+    searchInput: {
+        flex: 1,
+        height: 36,
+        borderRadius: 4,
+        paddingHorizontal: 36,
+        fontSize: 14,
+    },
+    closeBtn: {
+        padding: 4,
+    },
+    contentContainer: {
+        flex: 1,
+        flexDirection: "row",
+    },
+    sidebar: {
+        width: 48,
+        borderRightWidth: 1,
+        alignItems: "center",
+        paddingVertical: 8,
+    },
+    sidebarBtn: {
+        width: 48,
+        height: 48,
+        alignItems: "center",
+        justifyContent: "center",
+        borderLeftWidth: 3,
+        borderLeftColor: "transparent",
+        marginBottom: 2,
+    },
+    sidebarIcon: {
+        fontSize: 20,
+    },
+    listContent: {
+        paddingBottom: 20,
+    },
+    sectionHeader: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    sectionHeaderText: {
+        fontSize: 12,
+        fontWeight: "600",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    emojiGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        paddingHorizontal: 8,
+    },
+    emojiBtn: {
+        width: 40,
+        height: 40,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    emoji: {
+        fontSize: 26,
+    },
 });

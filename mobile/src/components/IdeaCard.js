@@ -1,19 +1,26 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
   withSpring,
   FadeIn,
   Layout,
-} from 'react-native-reanimated';
-import GlassCard from './GlassCard';
-import { useTheme } from '../context/ThemeContext';
+} from "react-native-reanimated";
+import GlassCard from "./GlassCard";
+import { useTheme } from "../context/ThemeContext";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-export default function IdeaCard({ idea, onPress, onArchive, onRestore, onDelete, index }) {
+export default function IdeaCard({
+  idea,
+  onPress,
+  onArchive,
+  onRestore,
+  onDelete,
+  index,
+}) {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
 
@@ -31,11 +38,11 @@ export default function IdeaCard({ idea, onPress, onArchive, onRestore, onDelete
 
   const formatDate = (date) => {
     const d = new Date(date);
-    return d.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -53,22 +60,26 @@ export default function IdeaCard({ idea, onPress, onArchive, onRestore, onDelete
       >
         <GlassCard style={styles.card}>
           <View style={styles.header}>
-            <View style={[styles.iconContainer, idea.icon_url && styles.iconContainerCustom]}>
+            <View
+              style={[
+                styles.iconContainer,
+                idea.icon_url && styles.iconContainerCustom,
+              ]}
+            >
               {idea.icon_url ? (
-                <Image 
-                  source={{ uri: idea.icon_url }} 
+                <Image
+                  source={{ uri: idea.icon_url }}
                   style={styles.customIcon}
                 />
               ) : (
-                <Ionicons 
-                  name="bulb" 
-                  size={20} 
-                  color={colors.accent} 
-                />
+                <Ionicons name="bulb" size={20} color={colors.accent} />
               )}
             </View>
             <View style={styles.titleContainer}>
-              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+              <Text
+                style={[styles.title, { color: colors.text }]}
+                numberOfLines={1}
+              >
                 {idea.title}
               </Text>
               <Text style={[styles.date, { color: colors.textTertiary }]}>
@@ -76,45 +87,61 @@ export default function IdeaCard({ idea, onPress, onArchive, onRestore, onDelete
               </Text>
             </View>
             {!idea.is_archived && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => onArchive(idea)}
               >
-                <Ionicons name="archive-outline" size={18} color={colors.textSecondary} />
-                <Text style={[styles.actionText, { color: colors.textSecondary }]}>Archive</Text>
+                <Ionicons
+                  name="archive-outline"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+                <Text
+                  style={[styles.actionText, { color: colors.textSecondary }]}
+                >
+                  Archive
+                </Text>
               </TouchableOpacity>
             )}
           </View>
-          
+
           {idea.is_archived && (
             <View style={styles.archivedActions}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.restoreButton, { backgroundColor: `${colors.accent}20` }]}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.restoreButton,
+                  { backgroundColor: `${colors.accent}20` },
+                ]}
                 onPress={() => onRestore(idea)}
               >
                 <Ionicons name="arrow-undo" size={18} color={colors.accent} />
-                <Text style={[styles.actionText, { color: colors.accent }]}>Restore to Active</Text>
+                <Text style={[styles.actionText, { color: colors.accent }]}>
+                  Restore to Active
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, styles.deleteButton]}
                 onPress={() => onDelete(idea)}
               >
                 <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                <Text style={[styles.actionText, { color: '#ef4444' }]}>Delete Permanently</Text>
+                <Text style={[styles.actionText, { color: "#ef4444" }]}>
+                  Delete Permanently
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
           {idea.content ? (
-            <Text 
-              style={[styles.content, { color: colors.textSecondary }]} 
+            <Text
+              style={[styles.content, { color: colors.textSecondary }]}
               numberOfLines={2}
             >
               {idea.content}
             </Text>
           ) : null}
-          
-          {idea.role === 'collaborator' && (
+
+          {idea.role === "collaborator" && (
             <View style={[styles.badge, { backgroundColor: colors.accent }]}>
               <Text style={styles.badgeText}>Shared</Text>
             </View>
@@ -130,20 +157,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   iconContainer: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 214, 0, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    backgroundColor: "rgba(255, 214, 0, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   iconContainerCustom: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   customIcon: {
     width: 36,
@@ -156,24 +183,24 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   date: {
     fontSize: 12,
     marginTop: 2,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 8,
     gap: 6,
   },
   actionText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   archivedActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginTop: 12,
     gap: 12,
   },
@@ -192,7 +219,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   badge: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     right: 12,
     paddingHorizontal: 8,
@@ -201,7 +228,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
   },
 });

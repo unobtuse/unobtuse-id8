@@ -96,3 +96,7 @@ echo "JS: $JS_FILE"
 echo "CSS: $CSS_FILE"
 echo ""
 echo "Clear Safari cache and reload: https://id8.unobtuse.com"
+
+#echo ""
+#echo "Starting Expo..."
+#npx expo start --tunnel --clear

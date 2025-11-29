@@ -1,18 +1,23 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring 
-} from 'react-native-reanimated';
-import { useTheme } from '../context/ThemeContext';
+import React from "react";
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+import { useTheme } from "../context/ThemeContext";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-export default function Button({ 
-  title, 
-  onPress, 
-  variant = 'primary', 
+export default function Button({
+  title,
+  onPress,
+  variant = "primary",
   loading = false,
   disabled = false,
   style,
@@ -33,16 +38,16 @@ export default function Button({
     scale.value = withSpring(1);
   };
 
-  const isPrimary = variant === 'primary';
-  const isOutline = variant === 'outline';
+  const isPrimary = variant === "primary";
+  const isOutline = variant === "outline";
 
   return (
     <AnimatedTouchable
       style={[
         styles.button,
         isPrimary && { backgroundColor: colors.accent },
-        isOutline && { 
-          backgroundColor: 'transparent', 
+        isOutline && {
+          backgroundColor: "transparent",
           borderWidth: 1,
           borderColor: colors.glassBorder,
         },
@@ -57,15 +62,17 @@ export default function Button({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? '#000' : colors.text} />
+        <ActivityIndicator color={isPrimary ? "#000" : colors.text} />
       ) : (
         <>
           {icon}
-          <Text style={[
-            styles.text,
-            isPrimary && { color: '#000' },
-            isOutline && { color: colors.text },
-          ]}>
+          <Text
+            style={[
+              styles.text,
+              isPrimary && { color: "#000" },
+              isOutline && { color: colors.text },
+            ]}
+          >
             {title}
           </Text>
         </>
@@ -76,9 +83,9 @@ export default function Button({
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -86,7 +93,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   disabled: {
     opacity: 0.5,

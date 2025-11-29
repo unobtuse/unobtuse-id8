@@ -103,9 +103,7 @@ export default function AuthScreen() {
                 },
             ]
         } >
-        Sign in to start tracking your ideas and collaborate with others. {
-            " "
-        } <
+        Sign in to start tracking your ideas and collaborate with others. <
         /Text> <
         Button title = "Continue with Google"
         onPress = {
@@ -145,13 +143,10 @@ export default function AuthScreen() {
                     color: colors.textSecondary,
                 },
             ]
-        } > {
-            " "
-        }
-        or {
-            " "
-        } <
-        /Text>{" "} < /
+        } >
+
+        or <
+        /Text> < /
         View > <
         Button title = "Sign in with Email"
         variant = "outline"
@@ -180,20 +175,28 @@ export default function AuthScreen() {
                 styles.switchMode
             } >
             <
-            Text style = {
-                [styles.switchText, {
-                    color: colors.textSecondary
-                }]
+            Text
+            style = {
+                [
+                    styles.switchText,
+                    {
+                        color: colors.textSecondary,
+                    },
+                ]
             } >
-            Don 't have an account?{" "} <
-            Text style = {
+            Don 't have an account? <
+            Text
+            style = {
                 {
-                    color: colors.accent
+                    color: colors.accent,
                 }
-            } > Sign up < /Text> <
-            /Text> <
-            /TouchableOpacity> <
-            />
+            } >
+
+            Sign up <
+            /Text> < /
+            Text > <
+            /TouchableOpacity> < /
+            >
         );
 
         const renderLogin = () => ( <
@@ -206,12 +209,9 @@ export default function AuthScreen() {
                         color: colors.text,
                     },
                 ]
-            } > {
-                " "
-            }
-            Sign In {
-                " "
-            } <
+            } >
+
+            Sign In <
             /Text> <
             TextInput style = {
                 [
@@ -283,7 +283,7 @@ export default function AuthScreen() {
             color = {
                 colors.textSecondary
             }
-            />{" "} <
+            /> <
             Text style = {
                 [
                     styles.backText,
@@ -291,12 +291,11 @@ export default function AuthScreen() {
                         color: colors.textSecondary,
                     },
                 ]
-            } > {
-                " "
-            }
+            } >
+
             Back <
-            /Text> <
-            /TouchableOpacity> <
+            /Text> < /
+            TouchableOpacity > <
             />
         );
 
@@ -310,12 +309,9 @@ export default function AuthScreen() {
                         color: colors.text,
                     },
                 ]
-            } > {
-                " "
-            }
-            Create Account {
-                " "
-            } <
+            } >
+
+            Create Account <
             /Text> <
             TextInput style = {
                 [
@@ -407,7 +403,7 @@ export default function AuthScreen() {
             color = {
                 colors.textSecondary
             }
-            />{" "} <
+            /> <
             Text style = {
                 [
                     styles.backText,
@@ -415,12 +411,11 @@ export default function AuthScreen() {
                         color: colors.textSecondary,
                     },
                 ]
-            } > {
-                " "
-            }
+            } >
+
             Back <
-            /Text> <
-            /TouchableOpacity> <
+            /Text> < /
+            TouchableOpacity > <
             />
         );
 
@@ -440,9 +435,9 @@ export default function AuthScreen() {
             }
             style = {
                 styles.logoContainer
-            } > {
-                " "
-            } {
+            } >
+
+            {
                 Platform.OS === "web" ? ( <
                     img src = {
                         logoUrl
@@ -457,8 +452,7 @@ export default function AuthScreen() {
                     >
                 ) : ( <
                     Image source = {
-                        theme === "dark" ?
-                        require("../../assets/id8-logo-darkmode.svg") : require("../../assets/id8-logo-lightmode.svg")
+                        require("../../assets/icon.png")
                     }
                     style = {
                         styles.logo
@@ -466,8 +460,6 @@ export default function AuthScreen() {
                     resizeMode = "contain" /
                     >
                 )
-            } {
-                " "
             } <
             /Animated.View> <
             Animated.View entering = {
@@ -482,10 +474,8 @@ export default function AuthScreen() {
                     },
                 ]
             } >
-            Capture ideas.Iterate.Collaborate. {
-                " "
-            } <
-            /Text>{" "} < /
+            Capture ideas.Iterate.Collaborate. <
+            /Text> < /
             Animated.View > <
             Animated.View entering = {
                 FadeInUp.delay(500).duration(600)
@@ -499,25 +489,17 @@ export default function AuthScreen() {
             }
             intensity = {
                 30
-            } > {
-                " "
-            } {
+            } >
+
+            {
                 mode === "welcome" && renderWelcome()
-            } {
-                " "
             } {
                 mode === "login" && renderLogin()
             } {
-                " "
-            } {
                 mode === "register" && renderRegister()
-            } {
-                " "
             } <
-            /GlassCard>{" "} < /
-            Animated.View > {
-                " "
-            } <
+            /GlassCard> < /
+            Animated.View > <
             /View> <
             Animated.Text entering = {
                 FadeIn.delay(800).duration(600)
@@ -530,13 +512,9 @@ export default function AuthScreen() {
                     },
                 ]
             } >
-            By continuing, you agree to our Terms of Service {
-                " "
-            } <
-            /Animated.Text>{" "} < /
-            SafeAreaView > {
-                " "
-            } <
+            By continuing, you agree to our Terms of Service <
+            /Animated.Text> < /
+            SafeAreaView > <
             /BackgroundWrapper>
         );
     }
@@ -556,8 +534,9 @@ export default function AuthScreen() {
             marginBottom: 32, // Increased margin
         },
         logo: {
-            width: 280,
-            height: 100,
+            width: 120,
+            height: 120,
+            marginBottom: 20,
         },
         subtitle: {
             fontSize: 18, // Slightly larger
@@ -576,14 +555,14 @@ export default function AuthScreen() {
         },
         cardTitle: {
             fontSize: 24,
-            fontWeight: 'bold',
+            fontWeight: "bold",
             marginBottom: 8,
-            textAlign: 'center', // Center title
+            textAlign: "center", // Center title
         },
         cardDescription: {
             fontSize: 14,
             marginBottom: 24,
-            textAlign: 'center', // Center description
+            textAlign: "center", // Center description
         },
         authButton: {
             width: "100%",
@@ -601,7 +580,7 @@ export default function AuthScreen() {
             fontWeight: "500",
         },
         input: {
-            width: '100%',
+            width: "100%",
             borderRadius: 16,
             paddingHorizontal: 20,
             paddingVertical: 16,

@@ -20,6 +20,7 @@ dist/
 build/
 .expo/
 web-build/
+web/_expo/
 
 # IDE
 .idea/
@@ -53,3 +54,5 @@ mobile/android/
 .bmad/
 .agent/
 .claude/
+
+AGENTS.md
